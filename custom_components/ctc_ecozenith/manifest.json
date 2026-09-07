@@ -1,15 +1,25 @@
 {
   "domain": "ctc_ecozenith",
   "name": "CTC EcoZenith",
-  "codeowners": ["@beolink"],
+  "codeowners": [
+    "@beolink"
+  ],
   "config_flow": true,
   "dependencies": [],
-  "dhcp": [{ "macaddress": "020000*" }],
+  "dhcp": [
+    {
+      "macaddress": "020000*"
+    }
+  ],
   "documentation": "https://github.com/beolink/ha-ctc",
   "integration_type": "device",
   "iot_class": "local_polling",
   "issue_tracker": "https://github.com/beolink/ha-ctc/issues",
-  "loggers": ["pymodbus"],
-  "requirements": ["pymodbus>=3.6.9"],
-  "version": "0.1.0"
+  "loggers": [
+    "pymodbus"
+  ],
+  "requirements": [
+    "pymodbus>=3.6.9"
+  ],
+  "version": "0.2.0"
 }

@@ -59,6 +59,11 @@ def discovery():
 
 
 @pytest.fixture(scope="session")
+def stats_extra():
+    return load("stats_extra")
+
+
+@pytest.fixture(scope="session")
 def wp118() -> str:
     return (FIXTURES / "wp_118.js").read_text(encoding="utf-8")
 

@@ -93,6 +93,31 @@ frequent writing can destroy the controller.
 - **The web interface is undocumented.** A firmware update can change it. Modbus
   is documented and will keep working.
 
+## Anonymous statistics
+
+The integration sends one report per day to <https://stats.rnet.se>: which
+version of the integration you run, your Home Assistant version and
+installation type, the country you have set in Home Assistant itself, how many
+entities the integration created, which transports are in use, whether control
+is enabled, how many display pages are harvested and how many register reads
+failed.
+
+It never sends a name, an address, a position, a serial number, an entity name,
+a page name or a single measurement from the house, and your IP address is not
+stored or used to guess where you are. Reports are stored per date, never per
+time of day, so they cannot show when anyone is home. What the backend accepts
+is a closed list with a pattern per field, so free text cannot be stored even
+by mistake. The numbers are public at <https://stats.rnet.se>.
+
+The point is to know which versions are actually in the field, which parts are
+worth maintaining and whether something is failing on units other than mine.
+
+To opt out: *Settings, Devices and services, CTC EcoZenith, Configure, Send
+anonymous usage statistics.* Switching it off also erases what has already been
+sent about your installation. The full list of fields and the reasoning:
+<https://stats.rnet.se/integritet>. The code that builds the report is
+`stats_extra.py`, and the client that sends it is `stats.py`.
+
 ## Licence
 
 Apache 2.0.

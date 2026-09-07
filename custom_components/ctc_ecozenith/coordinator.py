@@ -61,6 +61,9 @@ class CtcModbusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._blocks = plan_blocks(self.descriptions)
         self._missing: set[int] = set()
+        # Cumulative count of register blocks that did not answer. Only used by
+        # the optional daily report, which sends the delta since it last ran.
+        self.read_failures = 0
 
     async def _async_update_data(self) -> dict[str, Any]:
         raw: dict[int, int] = {}
@@ -72,6 +75,7 @@ class CtcModbusCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 continue
             for offset, value in enumerate(values):
                 raw[start + offset] = value
+        self.read_failures += failures
         if not raw:
             raise UpdateFailed("no Modbus register could be read")
         if failures:

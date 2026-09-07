@@ -21,6 +21,7 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .catalogue import async_discover_pages, pages_from_storage, pages_to_storage
+from .stats import OPTION_KEY as CONF_SEND_STATISTICS, async_forget_install
 from .const import (
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
@@ -347,6 +348,12 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
         if user_input is not None:
             if user_input.get("rescan"):
                 return await self.async_step_rescan()
+            was_on = self._entry.options.get(CONF_SEND_STATISTICS, True)
+            now_on = bool(user_input.get(CONF_SEND_STATISTICS, True))
+            if was_on and not now_on:
+                # Switching it off erases what has already been sent, rather
+                # than merely going quiet.
+                await async_forget_install(self.hass, self._entry, DOMAIN)
             return self.async_create_entry(
                 title="",
                 data={
@@ -355,6 +362,7 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                     CONF_SLOW_INTERVAL: int(user_input[CONF_SLOW_INTERVAL]),
                     CONF_RESTORE_PAGE: user_input[CONF_RESTORE_PAGE],
                     CONF_ENABLE_CONTROL: user_input[CONF_ENABLE_CONTROL],
+                    CONF_SEND_STATISTICS: now_on,
                 },
             )
 
@@ -386,6 +394,10 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_ENABLE_CONTROL,
                     default=options.get(CONF_ENABLE_CONTROL, False),
+                ): bool,
+                vol.Optional(
+                    CONF_SEND_STATISTICS,
+                    default=options.get(CONF_SEND_STATISTICS, True),
                 ): bool,
                 vol.Optional("rescan", default=False): bool,
             }

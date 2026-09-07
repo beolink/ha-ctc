@@ -9,12 +9,14 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.loader import async_get_integration
 
 from .catalogue import pages_from_storage
 from .const import (
@@ -39,6 +41,8 @@ from .const import (
 )
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
 from .modbus_api import CtcModbusClient
+from .stats import StatsReporter, async_setup_stats
+from .stats_extra import ErrorCounter, build_extra
 from .web_api import CtcWebClient
 
 _LOGGER = logging.getLogger(__name__)
@@ -54,6 +58,7 @@ class CtcRuntime:
     web: CtcWebCoordinator | None = None
     pages: list[SlowPage] = field(default_factory=list)
     control_enabled: bool = False
+    stats: StatsReporter | None = None
 
 
 type CtcConfigEntry = ConfigEntry[CtcRuntime]
@@ -127,6 +132,25 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         await modbus_client.async_close()
         raise
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+
+    # Anonymous daily report. On unless the user switches it off in the
+    # options, and it never opens a connection of its own: it reads what the
+    # coordinators already have. See stats_extra.py for exactly what is sent.
+    integration = await async_get_integration(hass, DOMAIN)
+    failures = ErrorCounter()
+
+    def _stats_extra() -> dict[str, Any]:
+        return build_extra(
+            entry.data.get("model"),
+            has_display=runtime.web is not None,
+            control_enabled=runtime.control_enabled,
+            page_count=len(runtime.pages),
+            read_failures=failures.delta(modbus.read_failures),
+        )
+
+    runtime.stats = await async_setup_stats(
+        hass, entry, DOMAIN, str(integration.version), extra=_stats_extra
+    )
     return True
 
 
@@ -139,6 +163,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         runtime = entry.runtime_data
+        if runtime.stats:
+            await runtime.stats.async_stop()
         await runtime.control.async_stop()
         await runtime.modbus.client.async_close()
     return unloaded
