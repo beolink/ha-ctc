@@ -71,6 +71,9 @@ class Widget:
     def centre(self) -> tuple[int, int]:
         return self.x + self.width // 2, self.y + self.height // 2
 
+    def overlaps_horizontally(self, other: "Widget") -> bool:
+        return self.x < other.x + other.width and other.x < self.x + self.width
+
 
 @dataclass
 class ScreenDef:
@@ -142,6 +145,30 @@ def parse_vars(payload: str) -> list[Any]:
         except ValueError:
             out.append(field)
     return out
+
+
+def tap_target(widgets: list["Widget"], label_widget: "Widget") -> tuple[int, int]:
+    """Return a point that actually presses the tile a caption belongs to.
+
+    Home screen tiles are an icon with the caption drawn underneath it as a
+    separate element. Matching finds the caption, but its own centre can fall
+    outside the touch area, so the icon sitting directly above it is preferred.
+    """
+    candidates = [
+        w
+        for w in widgets
+        if w is not label_widget
+        and w.visible
+        and w.kind in (0, 1)
+        and w.width > 20
+        and w.height > 20
+        and w.y + w.height <= label_widget.y + 4
+        and w.overlaps_horizontally(label_widget)
+    ]
+    if candidates:
+        icon = max(candidates, key=lambda w: w.y)
+        return icon.centre
+    return label_widget.centre
 
 
 def _select_from_group(group: Any, selector: int) -> tuple[str, int] | None:
@@ -400,86 +427,11 @@ class CtcWebClient:
             widgets.append(widget)
         return widgets
 
-    async def async_find_widget(self, screen: int, label: str) -> Widget | None:
-        """Return the first visible widget whose label matches, case folded."""
-        wanted = label.strip().casefold()
-        for widget in await self.async_widgets(screen):
-            if widget.visible and widget.label and widget.label.strip().casefold() == wanted:
-                return widget
-        return None
-
-    # ------------------------------------------------------------- navigation
-
-    def _click_path(self, screens: list[int]) -> str:
-        return ";".join(["glob", "menu", *(str(s) for s in screens)])
-
-    async def async_click(self, screens: list[int], x: int, y: int) -> list[list[Any]]:
-        """Send a tap. This moves the physical panel."""
-        payload = await self._request(f"/click/{self._click_path(screens)}", f"{x},{y}")
-        return [parse_vars(line) for line in payload.split("\r")]
-
-    async def async_click_noop(self, screens: list[int]) -> list[list[Any]]:
-        """Fetch the listed screens using a tap that cannot hit anything.
-
-        The coordinate is outside the 480 by 272 panel, which is a verified no
-        operation: the current page is unchanged afterwards.
-        """
-        return await self.async_click(screens, 9999, 9999)
-
-    async def async_goto_page(self, target: int, max_hops: int = 6) -> bool:
-        """Walk the panel to ``target`` using the operation data menu.
-
-        Only the operation data subtree is entered. That subtree is read only on
-        every CTC model checked, so a mistimed tap cannot change a setting.
-        """
-        page_map = await self.async_screen_map()
-        if target not in page_map:
-            raise CtcWebError(f"page {target} is not in the screen map")
-
-        current = await self.async_current_page()
-        if current == target:
-            return True
-
-        for _ in range(max_hops):
-            screens = page_map.get(current, [])
-            # Try the operation data tile first, then the chrome's back button.
-            moved = await self._try_operation_tile(screens)
-            if not moved:
-                moved = await self._try_back(screens)
-            if not moved:
-                return False
-            current = await self.async_current_page()
-            if current == target:
-                return True
-            hopped = await self._try_tabs(current, target, page_map)
-            if hopped:
-                return True
-            current = await self.async_current_page()
-        return await self.async_current_page() == target
-
-    async def _try_operation_tile(self, screens: list[int]) -> bool:
-        from .const import OPERATION_DATA_LABEL_EN
-
-        for screen in screens:
-            widgets = await self.async_widgets(screen)
-            for widget in widgets:
-                if not widget.visible or widget.width <= 0:
-                    continue
-                if widget.label is None:
-                    continue
-                english = await self.async_english_label(screen, widget)
-                if english == OPERATION_DATA_LABEL_EN:
-                    before = await self.async_current_page()
-                    x, y = widget.centre
-                    await self.async_click(screens, x, y)
-                    return await self.async_current_page() != before
-        return False
-
     async def async_english_label(self, screen: int, widget: Widget) -> str | None:
         """Resolve a widget's label in English, which is model independent.
 
-        Text ids differ between models, so menu items are matched on their
-        English string rather than on an id.
+        Text ids differ between models, 532 on an i255 and 570 on an i550 Pro for
+        the same menu item, so navigation matches on the English string instead.
         """
         definition = await self.async_screen_def(screen)
         if widget.index >= len(definition.c1):
@@ -514,40 +466,132 @@ class CtcWebClient:
             return None
         return await self.async_text(picked[1], language=0)
 
-    async def _try_back(self, screens: list[int]) -> bool:
-        """Tap the chrome's top right button, which steps back one level."""
-        before = await self.async_current_page()
-        await self.async_click(screens, 440, 23)
-        return await self.async_current_page() != before
+    async def async_find_widget(self, screen: int, label: str) -> Widget | None:
+        """Return the first visible widget whose label matches, case folded."""
+        wanted = label.strip().casefold()
+        for widget in await self.async_widgets(screen):
+            if widget.visible and widget.label and widget.label.strip().casefold() == wanted:
+                return widget
+        return None
 
-    async def _try_tabs(
-        self, current: int, target: int, page_map: dict[int, list[int]]
+    # ------------------------------------------------------------- navigation
+
+    def _click_path(self, screens: list[int]) -> str:
+        return ";".join(["glob", "menu", *(str(s) for s in screens)])
+
+    async def async_click(self, screens: list[int], x: int, y: int) -> list[list[Any]]:
+        """Send a tap. This moves the physical panel."""
+        payload = await self._request(f"/click/{self._click_path(screens)}", f"{x},{y}")
+        return [parse_vars(line) for line in payload.split("\r")]
+
+    async def async_click_noop(self, screens: list[int]) -> list[list[Any]]:
+        """Fetch the listed screens using a tap that cannot hit anything.
+
+        The coordinate is outside the 480 by 272 panel, which is a verified no
+        operation: the current page is unchanged afterwards.
+        """
+        return await self.async_click(screens, 9999, 9999)
+
+    async def async_goto_page(
+        self,
+        target: int,
+        route: list[tuple[int, int]] | None = None,
     ) -> bool:
-        """Walk the tab strip along the bottom of the operation data page."""
-        screens = page_map.get(current, [])
-        tab_row = await self._find_tab_row(screens)
-        for x, y in tab_row:
-            await self.async_click(screens, x, y)
-            if await self.async_current_page() == target:
-                return True
-            # Step back to the tab strip before trying the next tab.
-            here = await self.async_current_page()
-            if here != current:
-                await self.async_click(page_map.get(here, []), 440, 23)
-        return False
+        """Walk the panel to ``target``.
 
-    async def _find_tab_row(self, screens: list[int]) -> list[tuple[int, int]]:
-        """Return the centres of a row of equally sized boxes near the bottom."""
+        With a ``route`` recorded during setup the taps are simply replayed from
+        the operation data root, which is reliable across models. Without one the
+        only thing attempted is stepping back, which is enough to restore the
+        page the panel started on.
+        """
+        page_map = await self.async_screen_map()
+        if target not in page_map:
+            raise CtcWebError(f"page {target} is not in the screen map")
+        if await self.async_current_page() == target:
+            return True
+
+        if route:
+            if not await self.async_goto_operation_root():
+                return False
+            for x, y in route:
+                here = await self.async_current_page()
+                await self.async_click(page_map.get(here, []), x, y)
+            return await self.async_current_page() == target
+
+        return await self.async_step_back_to(target)
+
+    async def async_step_back_to(self, target: int, hops: int = 6) -> bool:
+        """Press the chrome's back button until ``target`` is showing.
+
+        The button at the top right steps back inside a submenu, but on the home
+        screen the same spot is a tile of its own. Revisiting a page therefore
+        means backing out is going in circles, and the walk stops.
+        """
+        page_map = await self.async_screen_map()
+        seen: set[int] = set()
+        for _ in range(hops):
+            here = await self.async_current_page()
+            if here == target:
+                return True
+            if here in seen:
+                return False
+            seen.add(here)
+            await self.async_click(page_map.get(here, []), 440, 23)
+            if await self.async_current_page() == here:
+                return False
+        return await self.async_current_page() == target
+
+    async def _async_operation_tile(
+        self, page: int
+    ) -> tuple[int, list[int], tuple[int, int]] | None:
+        """Find the operation data tile on ``page``, if it is there."""
+        from .const import OPERATION_DATA_LABEL_EN
+
+        page_map = await self.async_screen_map()
+        screens = page_map.get(page, [])
         for screen in screens:
-            widgets = [
-                w
-                for w in await self.async_widgets(screen)
-                if w.visible and w.height > 10 and w.width > 20 and w.y > 200
-            ]
-            if len(widgets) < 3:
+            try:
+                widgets = await self.async_widgets(screen)
+            except CtcWebError:
                 continue
-            widths = {w.width for w in widgets}
-            if len(widths) > 2:
-                continue
-            return [w.centre for w in sorted(widgets, key=lambda w: w.x)]
-        return []
+            for widget in widgets:
+                if not widget.visible or widget.label is None or widget.width <= 0:
+                    continue
+                if await self.async_english_label(screen, widget) == OPERATION_DATA_LABEL_EN:
+                    return screen, screens, tap_target(widgets, widget)
+        return None
+
+    async def async_goto_home(self, hops: int = 6) -> int | None:
+        """Step back until the home screen is showing.
+
+        Home is recognised by carrying the operation data tile rather than by the
+        back button ceasing to work, because on the home screen that spot is a
+        button which would navigate somewhere else entirely.
+        """
+        page_map = await self.async_screen_map()
+        seen: set[int] = set()
+        for _ in range(hops):
+            here = await self.async_current_page()
+            if await self._async_operation_tile(here) is not None:
+                return here
+            if here in seen:
+                return None
+            seen.add(here)
+            await self.async_click(page_map.get(here, []), 440, 23)
+            if await self.async_current_page() == here:
+                return None
+        here = await self.async_current_page()
+        return here if await self._async_operation_tile(here) is not None else None
+
+    async def async_goto_operation_root(self) -> bool:
+        """Navigate to the operation data menu from wherever the panel is."""
+        home = await self.async_goto_home()
+        if home is None:
+            return False
+        found = await self._async_operation_tile(home)
+        if found is None:
+            return False
+        _screen, screens, (x, y) = found
+        before = await self.async_current_page()
+        await self.async_click(screens, x, y)
+        return await self.async_current_page() != before

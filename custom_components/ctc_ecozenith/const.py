@@ -256,9 +256,16 @@ class SlowValue:
 
 @dataclass
 class SlowPage:
-    """A menu page of the display that can be polled as a unit."""
+    """A menu page of the display that can be polled as a unit.
+
+    ``route`` is the sequence of taps that reaches this page from the operation
+    data root, recorded while the menu was explored. Replaying a known route is
+    far more robust than trying to work the layout out again at poll time, since
+    an i255 and an i550 Pro lay their operation data pages out differently.
+    """
 
     page: int
     title: str
     screens: list[int] = field(default_factory=list)
     values: list[SlowValue] = field(default_factory=list)
+    route: list[tuple[int, int]] = field(default_factory=list)

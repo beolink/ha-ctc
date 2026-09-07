@@ -180,3 +180,23 @@ def test_model_names_come_from_the_settings_file(discovery):
 def test_unknown_settings_file_still_names_something(discovery):
     found = discovery.DiscoveredDisplay(host="1.2.3.4", settings_name="settings_future.bin")
     assert "future" in found.model
+
+
+def test_positional_suffix_does_not_hide_the_unit(catalogue):
+    # A row with two readings gets " 1" and " 2" appended, which used to push the
+    # unit out of reach of the pattern that looks at the end of the name.
+    assert catalogue._unit("%.1f", "Brine in/ut °C 1") == "°C"
+    assert catalogue._clean_label("Brine in/ut °C 2") == "Brine in/ut 2"
+    assert catalogue._base_label("Hetgas/Suggas °C 3") == "Hetgas/Suggas °C"
+
+
+def test_readings_without_a_caption_are_left_unnamed(catalogue, web_api):
+    # Schematic pages place readings on a diagram with no caption beside them.
+    # Naming them after whatever string is nearest produces confident nonsense.
+    widget = web_api.Widget
+    widgets = [
+        widget(index=0, kind=1, x=365, y=55, width=39, height=31, visible=True, label="Suomi"),
+        widget(index=1, kind=3, x=420, y=55, width=55, height=33, visible=True, value_fmt="%.1f", value_vars=[16]),
+    ]
+    pairing = catalogue._pair_labels(widgets)
+    assert 1 not in pairing

@@ -59,3 +59,38 @@ def test_balanced_array_survives_nesting_and_strings(web_api, wp118):
     assert raw.startswith("[") and raw.endswith("]")
     # Nested arrays must be included, not cut at the first closing bracket.
     assert raw.count("[") == raw.count("]")
+
+
+def test_tap_target_prefers_the_icon_above_a_caption(web_api):
+    # Home screen tiles are an icon with the caption drawn underneath as its own
+    # element. Tapping the caption's centre can miss the touch area.
+    widget = web_api.Widget
+    icon = widget(index=0, kind=1, x=338, y=65, width=79, height=79, visible=True)
+    caption = widget(
+        index=1, kind=3, x=322, y=150, width=111, height=22, visible=True, label="Driftinfo"
+    )
+    assert web_api.tap_target([icon, caption], caption) == icon.centre
+
+
+def test_tap_target_falls_back_to_the_caption(web_api):
+    widget = web_api.Widget
+    caption = widget(
+        index=0, kind=3, x=10, y=10, width=100, height=20, visible=True, label="Ensam"
+    )
+    assert web_api.tap_target([caption], caption) == caption.centre
+
+
+def test_tap_target_ignores_an_icon_below_the_caption(web_api):
+    widget = web_api.Widget
+    caption = widget(index=0, kind=3, x=10, y=10, width=100, height=20, visible=True, label="X")
+    below = widget(index=1, kind=1, x=10, y=60, width=80, height=80, visible=True)
+    assert web_api.tap_target([below, caption], caption) == caption.centre
+
+
+def test_widgets_overlap_horizontally(web_api):
+    widget = web_api.Widget
+    left = widget(index=0, kind=1, x=0, y=0, width=50, height=10, visible=True)
+    over = widget(index=1, kind=1, x=40, y=0, width=50, height=10, visible=True)
+    clear = widget(index=2, kind=1, x=60, y=0, width=50, height=10, visible=True)
+    assert left.overlaps_horizontally(over)
+    assert not left.overlaps_horizontally(clear)
