@@ -55,7 +55,7 @@
         },
         "data_description": {
           "enable_control": "Skapar styrentiteter som skriver till CTC:s flyktiga 1000-register. De nollställs av pumpen cirka fem minuter efter sista skrivningen, så styrningen släpper av sig själv om Home Assistant stannar. De lagrade inställningarna i 61500-serien rörs aldrig.",
-          "send_statistics": "En rapport per dygn till stats.rnet.se: integrationens version, Home Assistant-version och installationstyp, landet du ställt in i Home Assistant, en ungefärlig plats avrundad till cirka 11 km, antal entiteter, vilka transporter som används och antal misslyckade registeravläsningar. Aldrig namn, adress, exakt position, serienummer, entitetsnamn eller mätvärden från huset, aldrig något finare än ett dygn, och din IP-adress sparas inte. Stänger du av den raderas också det som redan skickats. Hela listan: https://stats.rnet.se/integritet"
+          "send_statistics": "En rapport per dygn till {endpoint}: integrationens version, Home Assistant-version och installationstyp, landet du ställt in i Home Assistant, en ungefärlig plats avrundad till cirka 11 km, antal entiteter, vilka transporter som används och antal misslyckade registeravläsningar. Aldrig namn, adress, exakt position, serienummer, entitetsnamn eller mätvärden från huset, aldrig något finare än ett dygn, och din IP-adress sparas inte. Stänger du av den raderas också det som redan skickats. Hela listan: {privacy_url}"
         }
       },
       "rescan": {

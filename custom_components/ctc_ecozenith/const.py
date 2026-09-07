@@ -32,6 +32,9 @@ CONF_PARK_PAGE: Final = "park_page"
 CONF_RESTORE_PAGE: Final = "restore_page"
 CONF_ENABLE_CONTROL: Final = "enable_control"
 CONF_FAST_INTERVAL: Final = "fast_interval"
+# Must match OPTION_KEY in stats.py. Kept here so config_flow can build its
+# schema without importing stats.py, which pulls in Home Assistant.
+CONF_SEND_STATISTICS: Final = "send_statistics"
 
 DEFAULT_FAST_INTERVAL: Final = 30
 DEFAULT_SLOW_INTERVAL: Final = 1800

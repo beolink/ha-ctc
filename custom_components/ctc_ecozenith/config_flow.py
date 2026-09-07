@@ -21,9 +21,9 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .catalogue import async_discover_pages, pages_from_storage, pages_to_storage
-from .stats import OPTION_KEY as CONF_SEND_STATISTICS, async_forget_install
 from .const import (
     CONF_ENABLE_CONTROL,
+    CONF_SEND_STATISTICS,
     CONF_FAST_INTERVAL,
     CONF_LANGUAGE,
     CONF_MODBUS_PORT,
@@ -51,6 +51,14 @@ from .modbus_api import CtcModbusClient, CtcModbusError
 from .web_api import CtcWebClient, CtcWebError
 
 _LOGGER = logging.getLogger(__name__)
+
+# hassfest rejects URLs in strings.json, so the addresses travel as
+# placeholders instead.
+STATS_PLACEHOLDERS = {
+    "endpoint": "stats.rnet.se",
+    "endpoint_url": "https://stats.rnet.se",
+    "privacy_url": "https://stats.rnet.se/integritet",
+}
 
 CONF_PICKED = "picked"
 MANUAL = "manual"
@@ -352,7 +360,11 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
             now_on = bool(user_input.get(CONF_SEND_STATISTICS, True))
             if was_on and not now_on:
                 # Switching it off erases what has already been sent, rather
-                # than merely going quiet.
+                # than merely going quiet. Imported here rather than at the top:
+                # stats.py pulls in Home Assistant, and this module is imported
+                # by tests that run without it.
+                from .stats import async_forget_install
+
                 await async_forget_install(self.hass, self._entry, DOMAIN)
             return self.async_create_entry(
                 title="",
@@ -402,7 +414,10 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional("rescan", default=False): bool,
             }
         )
-        return self.async_show_form(step_id="init", data_schema=schema)
+        return self.async_show_form(
+            step_id="init", data_schema=schema,
+            description_placeholders=STATS_PLACEHOLDERS,
+        )
 
     async def async_step_rescan(
         self, user_input: dict[str, Any] | None = None
