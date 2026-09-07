@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Välj värmepump",
+        "description": "Nätverket har genomsökts efter CTC-displayer.",
+        "data": { "picked": "Hittade enheter" }
+      },
+      "manual": {
+        "title": "Ange adress",
+        "description": "Ingen CTC hittades automatiskt. Adressen står i pumpens meny under Avancerat, Inställningar, Kommunikation, Ethernet.",
+        "data": {
+          "host": "IP-adress",
+          "modbus_port": "Modbus TCP-port",
+          "web_port": "Webbport",
+          "slave": "Modbus-adress"
+        }
+      },
+      "slow": {
+        "title": "Långsamma värden från displayen",
+        "description": "Modbus läses hela tiden och sköter all styrning. Displayens webbgränssnitt har dessutom värden som Modbus saknar, till exempel avgiven värme.\n\nFällan är att bara den sida panelen visar hålls färsk, så integrationen måste bläddra dit och tillbaka. Panelen rör sig då för den som står vid den. Kryssa i de sidor du vill hämta, eller hoppa över steget och kör enbart Modbus.\n\n{count} sidor hittades i {model}.",
+        "data": {
+          "slow_pages": "Sidor att hämta",
+          "slow_interval": "Hur ofta",
+          "restore_page": "Ställ tillbaka panelen efteråt"
+        }
+      }
+    },
+    "error": {
+      "not_a_ctc": "Adressen svarar, men det är ingen CTC-display.",
+      "modbus_failed": "Displayen svarar men Modbus gör det inte. Slå på det i pumpens meny under Avancerat, Definiera, Fjärrstyrning, där Ethernet ska stå på Modbus TCP."
+    },
+    "abort": {
+      "already_configured": "Den här värmepumpen är redan tillagd.",
+      "not_a_ctc": "Enheten är ingen CTC-display."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Inställningar",
+        "data": {
+          "fast_interval": "Modbus-intervall",
+          "slow_interval": "Displayintervall",
+          "restore_page": "Ställ tillbaka panelen efteråt",
+          "enable_control": "Tillåt styrning av värmepumpen",
+          "rescan": "Läs om displayens meny"
+        },
+        "data_description": {
+          "enable_control": "Skapar styrentiteter som skriver till CTC:s flyktiga 1000-register. De nollställs av pumpen cirka fem minuter efter sista skrivningen, så styrningen släpper av sig själv om Home Assistant stannar. De lagrade inställningarna i 61500-serien rörs aldrig."
+        }
+      },
+      "rescan": {
+        "title": "Långsamma värden från displayen",
+        "description": "{count} sidor hittades. Panelen har flyttats under avläsningen och ställts tillbaka.",
+        "data": {
+          "slow_pages": "Sidor att hämta",
+          "slow_interval": "Hur ofta",
+          "restore_page": "Ställ tillbaka panelen efteråt"
+        }
+      }
+    }
+  }
+}

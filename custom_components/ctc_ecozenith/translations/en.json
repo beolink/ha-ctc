@@ -1,0 +1,64 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Choose heat pump",
+        "description": "The local network has been swept for CTC displays.",
+        "data": { "picked": "Devices found" }
+      },
+      "manual": {
+        "title": "Enter address",
+        "description": "No CTC was found automatically. The address is shown on the panel under Installer, Settings, Communication, Ethernet.",
+        "data": {
+          "host": "IP address",
+          "modbus_port": "Modbus TCP port",
+          "web_port": "Web port",
+          "slave": "Modbus address"
+        }
+      },
+      "slow": {
+        "title": "Slow values from the display",
+        "description": "Modbus is read continuously and handles all control. The display's web interface additionally carries values Modbus does not have, such as delivered heat.\n\nThe catch is that only the page the panel is showing stays fresh, so the integration has to walk there and back. The panel moves while it does. Tick the pages you want, or skip this step and run on Modbus alone.\n\n{count} pages were found on the {model}.",
+        "data": {
+          "slow_pages": "Pages to read",
+          "slow_interval": "How often",
+          "restore_page": "Put the panel back afterwards"
+        }
+      }
+    },
+    "error": {
+      "not_a_ctc": "That address answers, but it is not a CTC display.",
+      "modbus_failed": "The display answers but Modbus does not. Turn it on from the panel under Installer, Define, Remote control, where Ethernet must be set to Modbus TCP."
+    },
+    "abort": {
+      "already_configured": "This heat pump is already set up.",
+      "not_a_ctc": "The device is not a CTC display."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "data": {
+          "fast_interval": "Modbus interval",
+          "slow_interval": "Display interval",
+          "restore_page": "Put the panel back afterwards",
+          "enable_control": "Allow controlling the heat pump",
+          "rescan": "Read the display's menu again"
+        },
+        "data_description": {
+          "enable_control": "Creates control entities that write to CTC's volatile 1000 registers. The controller forgets them about five minutes after the last write, so control releases itself if Home Assistant stops. The stored settings in the 61500 block are never written."
+        }
+      },
+      "rescan": {
+        "title": "Slow values from the display",
+        "description": "{count} pages were found. The panel was moved during the scan and put back.",
+        "data": {
+          "slow_pages": "Pages to read",
+          "slow_interval": "How often",
+          "restore_page": "Put the panel back afterwards"
+        }
+      }
+    }
+  }
+}
