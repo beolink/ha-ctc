@@ -73,8 +73,17 @@ def _coarse(value: float | None) -> float | None:
 
 
 def stats_enabled(entry: ConfigEntry) -> bool:
-    """True unless the user has switched reporting off."""
-    return bool(entry.options.get(OPTION_KEY, True))
+    """True unless the user has switched reporting off.
+
+    Options win, then data: some integrations keep their settings in the entry
+    data and only ever write an empty options dict, and the switch must work
+    the same way in all of them.
+    """
+    options = getattr(entry, "options", None) or {}
+    if OPTION_KEY in options:
+        return bool(options[OPTION_KEY])
+    data = getattr(entry, "data", None) or {}
+    return bool(data.get(OPTION_KEY, True))
 
 
 class StatsReporter:
