@@ -3,8 +3,9 @@
 Copy the file to custom_components/<domain>/stats.py and wire it in as
 described in the backend repo. It sends one report per day to stats.rnet.se:
 version, Home Assistant version, country as configured in Home Assistant
-itself, entity counts and a few on/off flags. Never a name, an address, a
-position, a serial number, an entity id or a measurement from the house.
+itself, entity counts, a few on/off flags and an approximate position rounded
+to about 11 km. Never a name, an address, an exact position, a serial number,
+an entity id or anything at a finer resolution than one day.
 
 Reporting is on by default and is switched off in the integration's options.
 Switching it off sends one last call that erases everything stored about this
@@ -46,7 +47,12 @@ TIMEOUT = 10
 #: Only these keys may be added by the integration's own extra callback. The
 #: backend rejects anything else, but stopping it here keeps a careless caller
 #: from ever putting house data on the wire in the first place.
-EXTRA_KEYS = ("models", "features", "errors")
+EXTRA_KEYS = ("models", "features", "errors", "metrics")
+
+#: Decimals kept of the position. One decimal is roughly 11 km, which is enough
+#: for climate, price area and a readable map, and far too coarse to point at a
+#: house. The rounding happens here, so a finer value never leaves the machine.
+POSITION_DECIMALS = 1
 
 _INSTALL_TYPES = {
     "Home Assistant OS": "os",
@@ -54,6 +60,16 @@ _INSTALL_TYPES = {
     "Home Assistant Container": "container",
     "Home Assistant Core": "core",
 }
+
+
+def _coarse(value: float | None) -> float | None:
+    """Round a coordinate to the reporting grid, or drop it if it is missing."""
+    if value is None:
+        return None
+    try:
+        return round(float(value), POSITION_DECIMALS)
+    except (TypeError, ValueError):
+        return None
 
 
 def stats_enabled(entry: ConfigEntry) -> bool:
@@ -143,6 +159,8 @@ class StatsReporter:
 
         language = (self.hass.config.language or "")[:2].lower() or None
         country = self.hass.config.country or None
+        lat = _coarse(getattr(self.hass.config, "latitude", None))
+        lon = _coarse(getattr(self.hass.config, "longitude", None))
 
         payload: dict[str, Any] = {
             "schema": SCHEMA_VERSION,
@@ -156,6 +174,8 @@ class StatsReporter:
             "language": language,
             "entities": entities,
             "devices": devices,
+            "lat": lat,
+            "lon": lon,
         }
         if self.extra:
             try:

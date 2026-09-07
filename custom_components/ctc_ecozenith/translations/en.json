@@ -55,7 +55,7 @@
         },
         "data_description": {
           "enable_control": "Creates control entities that write to CTC's volatile 1000 registers. The controller forgets them about five minutes after the last write, so control releases itself if Home Assistant stops. The stored settings in the 61500 block are never written.",
-          "send_statistics": "One report per day to stats.rnet.se: integration version, Home Assistant version and installation type, the country you configured in Home Assistant, the number of entities, which transports are in use and the number of failed register reads. Never a name, an address, a position, a serial number, an entity name or a measurement from the house, and your IP address is not stored. Switching this off also erases what has already been sent. The full list: https://stats.rnet.se/integritet"
+          "send_statistics": "One report per day to stats.rnet.se: integration version, Home Assistant version and installation type, the country you configured in Home Assistant, an approximate position rounded to about 11 km, the number of entities, which transports are in use and the number of failed register reads. Never a name, an address, an exact position, a serial number, an entity name or a measurement from the house, never anything finer than one day, and your IP address is not stored. Switching this off also erases what has already been sent. The full list: https://stats.rnet.se/integritet"
         }
       },
       "rescan": {

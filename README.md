@@ -97,14 +97,16 @@ frequent writing can destroy the controller.
 
 The integration sends one report per day to <https://stats.rnet.se>: which
 version of the integration you run, your Home Assistant version and
-installation type, the country you have set in Home Assistant itself, how many
-entities the integration created, which transports are in use, whether control
-is enabled, how many display pages are harvested and how many register reads
-failed.
+installation type, the country you have set in Home Assistant itself, an
+approximate position rounded to about 11 km, how many entities the integration
+created, which transports are in use, whether control is enabled, how many
+display pages are harvested and how many register reads failed.
 
-It never sends a name, an address, a position, a serial number, an entity name,
-a page name or a single measurement from the house, and your IP address is not
-stored or used to guess where you are. Reports are stored per date, never per
+It never sends a name, an address, an exact position, a serial number, an entity
+name, a page name or a single measurement from the house, and your IP address is
+not stored or used to guess where you are. The position is rounded inside your
+own installation before anything is sent, and rounded again on the server, so a
+finer value does not exist in the database. Reports are stored per date, never per
 time of day, so they cannot show when anyone is home. What the backend accepts
 is a closed list with a pattern per field, so free text cannot be stored even
 by mistake. The numbers are public at <https://stats.rnet.se>.
