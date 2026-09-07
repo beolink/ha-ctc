@@ -170,10 +170,10 @@ def test_storage_discards_damaged_entries(catalogue):
 
 
 def test_model_names_come_from_the_settings_file(discovery):
-    found = discovery.DiscoveredDisplay(host="10.0.40.55", settings_name="settings_ezi2xx.bin")
+    found = discovery.DiscoveredDisplay(host="192.168.1.55", settings_name="settings_ezi2xx.bin")
     assert "i255" in found.model
     assert found.host in found.label
-    other = discovery.DiscoveredDisplay(host="10.0.11.155", settings_name="settings_ezi5xx.bin")
+    other = discovery.DiscoveredDisplay(host="192.168.1.155", settings_name="settings_ezi5xx.bin")
     assert "i550" in other.model
 
 
