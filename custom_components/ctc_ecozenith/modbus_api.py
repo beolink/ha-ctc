@@ -9,12 +9,20 @@ handshake for a second client and then resets the connection as soon as that
 client sends a PDU, which looks like the unit being offline. One connection is
 therefore held for the lifetime of the entry and every request is serialised
 behind a lock.
+
+CTC also sets a pace. The BMS documentation gives an update rate of 1000 ms and
+the controller cannot pipeline, so exactly one request may be outstanding and
+requests are spaced out rather than sent back to back. It also needs a moment
+after the socket opens before it will answer. Both are enforced here rather than
+left to the caller, because getting them wrong looks like an unreliable network
+instead of a client that is talking too fast.
 """
 
 from __future__ import annotations
 
 import asyncio
 import logging
+import time
 from typing import Any
 
 from .const import SENTINELS, ModbusSensor
@@ -24,6 +32,17 @@ _LOGGER = logging.getLogger(__name__)
 MAX_BLOCK = 100
 CONNECT_TIMEOUT = 10
 REQUEST_TIMEOUT = 10
+
+# Shortest gap between two transactions. CTC documents an update rate of one
+# second for the BMS interface; the community Modbus configurations that work
+# use tens of milliseconds between messages. Sixty is a compromise that keeps a
+# full poll brisk without crowding the controller.
+MESSAGE_WAIT = 0.06
+
+# The controller needs a moment after the socket opens before it answers. The
+# widely used YAML packages wait five seconds; three is enough in practice and
+# only costs anything on the first poll after a reconnect.
+CONNECT_DELAY = 3.0
 
 
 class CtcModbusError(Exception):
@@ -54,6 +73,7 @@ class CtcModbusClient:
         self._slave = slave
         self._client: Any = None
         self._lock = asyncio.Lock()
+        self._last_request = 0.0
 
     async def _ensure_client(self) -> Any:
         if self._client is not None and getattr(self._client, "connected", False):
@@ -72,7 +92,15 @@ class CtcModbusClient:
             raise CtcModbusError(f"could not connect to {self._host}:{self._port}") from err
         if not getattr(self._client, "connected", False):
             raise CtcModbusError(f"could not connect to {self._host}:{self._port}")
+        await asyncio.sleep(CONNECT_DELAY)
+        self._last_request = time.monotonic()
         return self._client
+
+    async def _pace(self) -> None:
+        """Hold the documented gap between two transactions."""
+        gap = MESSAGE_WAIT - (time.monotonic() - self._last_request)
+        if gap > 0:
+            await asyncio.sleep(gap)
 
     async def async_close(self) -> None:
         async with self._lock:
@@ -107,6 +135,7 @@ class CtcModbusClient:
             offset = 0
             while offset < count:
                 chunk = min(MAX_BLOCK, count - offset)
+                await self._pace()
                 try:
                     result = await asyncio.wait_for(
                         client.read_holding_registers(
@@ -124,6 +153,7 @@ class CtcModbusClient:
                     raise CtcModbusError(f"read of {address + offset} failed: {err}") from err
                 if result is None or getattr(result, "isError", lambda: True)():
                     raise CtcModbusError(f"read of {address + offset} returned an error")
+                self._last_request = time.monotonic()
                 out.extend(result.registers)
                 offset += chunk
         return out
@@ -142,6 +172,7 @@ class CtcModbusClient:
             client = await self._ensure_client()
             kwargs = self._slave_kwargs(client, "write_registers")
             raw = value & 0xFFFF if value >= 0 else (value + 65536) & 0xFFFF
+            await self._pace()
             try:
                 result = await asyncio.wait_for(
                     client.write_registers(address, [raw], **kwargs),
@@ -151,6 +182,7 @@ class CtcModbusClient:
                 raise CtcModbusError(f"write to {address} timed out") from err
             except Exception as err:  # noqa: BLE001
                 raise CtcModbusError(f"write to {address} failed: {err}") from err
+            self._last_request = time.monotonic()
             if result is None or getattr(result, "isError", lambda: True)():
                 raise CtcModbusError(f"write to {address} returned an error")
 

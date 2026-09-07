@@ -200,3 +200,36 @@ def test_readings_without_a_caption_are_left_unnamed(catalogue, web_api):
     ]
     pairing = catalogue._pair_labels(widgets)
     assert 1 not in pairing
+
+
+def test_pacing_holds_the_gap_between_transactions(modbus_api):
+    # CTC documents an update rate for the BMS interface and cannot pipeline, so
+    # the client must space requests out rather than send them back to back.
+    import asyncio
+    import time
+
+    client = modbus_api.CtcModbusClient("192.168.1.55")
+
+    async def scenario() -> float:
+        client._last_request = time.monotonic()
+        started = time.monotonic()
+        await client._pace()
+        return time.monotonic() - started
+
+    waited = asyncio.run(scenario())
+    assert waited >= modbus_api.MESSAGE_WAIT * 0.8
+
+
+def test_pacing_does_not_wait_when_the_gap_has_passed(modbus_api):
+    import asyncio
+    import time
+
+    client = modbus_api.CtcModbusClient("192.168.1.55")
+
+    async def scenario() -> float:
+        client._last_request = time.monotonic() - 10
+        started = time.monotonic()
+        await client._pace()
+        return time.monotonic() - started
+
+    assert asyncio.run(scenario()) < modbus_api.MESSAGE_WAIT

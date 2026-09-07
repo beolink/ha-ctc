@@ -78,6 +78,12 @@ frequent writing can destroy the controller.
 - **One Modbus master.** The controller accepts a second TCP connection and then
   resets it as soon as that client sends anything, which looks exactly like the
   unit being offline. Do not point a second tool at it while this is running.
+  That includes a `modbus:` block in `configuration.yaml` pointing at the same
+  unit, which has to be removed before this integration can connect.
+- **CTC sets the pace.** The controller cannot pipeline and documents an update
+  rate of one second, so requests are serialised, spaced out, and capped at a
+  hundred registers each. It also needs a moment after the socket opens before
+  it answers, so the first poll after a reconnect is delayed deliberately.
 - **The web server drops connections above roughly five in flight.** The client
   keeps three.
 - **Absent hardware still answers.** The controller replies for ten heat pumps
