@@ -143,9 +143,9 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
     ModbusSensor("hp1_low_pressure", 62077, "Lågtryck", 0.1, "bar", "pressure"),
     ModbusSensor("hp1_brine_in", 62087, "Köldbärare in", 0.1, "°C", _T),
     ModbusSensor("hp1_brine_out", 62097, "Köldbärare ut", 0.1, "°C", _T),
-    ModbusSensor("hp1_charge_pump", 62107, "Laddpump", 1, "%", None),
-    ModbusSensor("hp1_brine_pump", 62117, "Brinepump", 1, "%", None),
-    ModbusSensor("hp1_fan", 62127, "Fläkt", 1, "%", None),
+    ModbusSensor("hp1_charge_pump", 62107, "Laddpump", 0.1, "%", None),
+    ModbusSensor("hp1_brine_pump", 62117, "Brinepump", 0.1, "%", None),
+    ModbusSensor("hp1_fan", 62127, "Fläkt", 0.1, "%", None),
     ModbusSensor("hp1_defrost_timer", 62137, "Avfrostningstimer", 1, None, None, enabled_default=False),
     ModbusSensor("hp1_outdoor_temp", 62147, "Utetemperatur vid värmepump", 0.1, "°C", _T, enabled_default=False),
     ModbusSensor("degree_minutes", 62167, "Gradminuter", 1, None, None),
@@ -165,6 +165,8 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
     ModbusSensor("dhw_lower_temp", 62275, "Varmvatten nedre", 0.1, "°C", _T, enabled_default=False),
     ModbusSensor("dhw_temp", 62276, "Varmvatten", 0.1, "°C", _T),
     ModbusSensor("dhw_capacity", 62279, "Varmvattenkapacitet", 1, "%", None),
+    # Pump and fan speeds carry one decimal: an EcoAir 720M running at 66.2 per
+    # cent reports 662, which read as a whole number would be nonsense.
     ModbusSensor("sg_mode", 62301, "SmartGrid-läge", 1, None, None, None, enum=SG_MODE),
     # 62331 is documented as supplied power per heat pump. On an i550 Pro it
     # reads 65.5 with the compressor stopped, which cannot be kilowatts, so it

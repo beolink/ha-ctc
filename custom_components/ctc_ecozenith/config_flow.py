@@ -40,7 +40,12 @@ from .const import (
     LANG_SWEDISH,
     MIN_SLOW_INTERVAL,
 )
-from .discovery import DiscoveredDisplay, async_discover, async_probe_host
+from .discovery import (
+    DiscoveredDisplay,
+    async_discover,
+    async_home_assistant_networks,
+    async_probe_host,
+)
 from .modbus_api import CtcModbusClient, CtcModbusError
 from .web_api import CtcWebClient, CtcWebError
 
@@ -84,7 +89,8 @@ class CtcConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         session = async_get_clientsession(self.hass)
         try:
-            self._found = await async_discover(session)
+            networks = await async_home_assistant_networks(self.hass)
+            self._found = await async_discover(session, networks)
         except Exception as err:  # noqa: BLE001 - a failed sweep must not block setup
             _LOGGER.debug("Network sweep failed: %s", err)
             self._found = []

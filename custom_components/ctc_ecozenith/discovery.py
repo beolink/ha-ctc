@@ -27,10 +27,13 @@ PROBE_CONCURRENCY = 8
 PORT_TIMEOUT = 0.4
 PROBE_TIMEOUT = 4.0
 
+# The settings file names a family, not an exact model. The name chosen here is
+# the member of each family that has the display with Modbus TCP, since that is
+# the only kind this integration can talk to at all.
 MODEL_NAMES = {
-    "ezi2xx": "EcoZenith i250 / i255",
-    "ezi3xx": "EcoZenith i350 / i360",
-    "ezi5xx": "EcoZenith i550 Pro / i555 Pro",
+    "ezi2xx": "EcoZenith i255",
+    "ezi3xx": "EcoZenith i360",
+    "ezi5xx": "EcoZenith i550 Pro",
     "ecologic": "EcoLogic",
 }
 
@@ -112,6 +115,43 @@ async def async_probe_host(
     if body.startswith("settings_") and body.endswith(".bin"):
         return DiscoveredDisplay(host=host, settings_name=body)
     return None
+
+
+async def async_home_assistant_networks(hass) -> list[ipaddress.IPv4Network]:
+    """Return the networks Home Assistant itself is attached to.
+
+    Home Assistant usually runs in a container, so asking the operating system
+    for "my" address returns the container bridge rather than the network the
+    heat pump is on. Home Assistant knows the real adapters, including their
+    prefix, which also covers installations on a /23 rather than a /24.
+    """
+    networks: list[ipaddress.IPv4Network] = []
+    try:
+        from homeassistant.components import network as ha_network
+
+        adapters = await ha_network.async_get_adapters(hass)
+    except Exception as err:  # noqa: BLE001 - fall back to the socket method
+        _LOGGER.debug("Could not read adapters from Home Assistant: %s", err)
+        return local_networks()
+
+    seen: set[str] = set()
+    for adapter in adapters:
+        if not adapter.get("enabled", True):
+            continue
+        for address in adapter.get("ipv4", []):
+            ip = address.get("address")
+            prefix = address.get("network_prefix")
+            if not ip or prefix is None or ip.startswith("127."):
+                continue
+            try:
+                candidate = ipaddress.ip_network(f"{ip}/{prefix}", strict=False)
+            except ValueError:
+                continue
+            if candidate.num_addresses > 1024 or str(candidate) in seen:
+                continue
+            seen.add(str(candidate))
+            networks.append(candidate)  # type: ignore[arg-type]
+    return networks or local_networks()
 
 
 async def async_discover(

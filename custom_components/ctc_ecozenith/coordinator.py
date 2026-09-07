@@ -150,7 +150,10 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         try:
             for page in self.pages:
                 if await self.client.async_current_page() != page.page:
-                    moved = await self.client.async_goto_page(page.page)
+                    # The route was recorded during setup. Replaying it is the
+                    # only reliable way in, since the menu layout differs between
+                    # models and cannot be derived at poll time.
+                    moved = await self.client.async_goto_page(page.page, page.route)
                     if not moved:
                         _LOGGER.debug("Could not reach page %s", page.page)
                         continue

@@ -79,7 +79,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         identifiers={(DOMAIN, host)},
         manufacturer="CTC / Enertech",
         model=entry.data.get("model", "CTC"),
-        name=entry.title,
+        # The device name becomes the prefix of every entity id, so it stays
+        # short. The entry title keeps the address for telling two units apart.
+        name=f"CTC {entry.data.get('model', 'värmepump')}",
         configuration_url=f"http://{host}:{web_port}/main.html",
     )
 
