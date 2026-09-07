@@ -4,7 +4,9 @@
       "user": {
         "title": "Välj värmepump",
         "description": "Nätverket har genomsökts efter CTC-displayer.",
-        "data": { "picked": "Hittade enheter" }
+        "data": {
+          "picked": "Hittade enheter"
+        }
       },
       "manual": {
         "title": "Ange adress",
@@ -24,6 +26,10 @@
           "slow_interval": "Hur ofta",
           "restore_page": "Ställ tillbaka panelen efteråt"
         }
+      },
+      "confirm": {
+        "title": "Lägg till {model}?",
+        "description": "En CTC-display hittades på {host}. Uppsättningen bläddrar i pumpens meny för att se vilka värden den kan lämna, så panelen rör sig en stund."
       }
     },
     "error": {

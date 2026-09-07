@@ -73,7 +73,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         modbus_client,
         int(options.get(CONF_FAST_INTERVAL, DEFAULT_FAST_INTERVAL)),
     )
-    await modbus.async_config_entry_first_refresh()
+    try:
+        await modbus.async_config_entry_first_refresh()
+    except Exception:
+        # The controller allows a single Modbus client. A failed attempt that
+        # leaves its socket open holds that slot, so every retry then fails as
+        # well and the entry can never recover on its own.
+        await modbus_client.async_close()
+        raise
 
     device = DeviceInfo(
         identifiers={(DOMAIN, host)},
@@ -114,7 +121,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         runtime.pages = pages
 
     entry.runtime_data = runtime
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    try:
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    except Exception:
+        await modbus_client.async_close()
+        raise
     entry.async_on_unload(entry.add_update_listener(_async_reload))
     return True
 

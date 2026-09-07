@@ -270,7 +270,23 @@ class CtcConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._model = display.model
         self._settings_name = display.settings_name
         self.context["title_placeholders"] = {"name": display.label}
-        return await self.async_step_connect()
+        return await self.async_step_confirm()
+
+    async def async_step_confirm(
+        self, user_input: dict[str, Any] | None = None
+    ) -> FlowResult:
+        """Ask before adopting a unit that turned up by itself.
+
+        Setting the entry up walks the panel through its menus, so a discovered
+        unit is never adopted silently.
+        """
+        if user_input is not None:
+            return await self.async_step_connect()
+        self._set_confirm_only()
+        return self.async_show_form(
+            step_id="confirm",
+            description_placeholders={"model": self._model, "host": self._host or ""},
+        )
 
     @staticmethod
     @callback

@@ -4,7 +4,9 @@
       "user": {
         "title": "Choose heat pump",
         "description": "The local network has been swept for CTC displays.",
-        "data": { "picked": "Devices found" }
+        "data": {
+          "picked": "Devices found"
+        }
       },
       "manual": {
         "title": "Enter address",
@@ -24,6 +26,10 @@
           "slow_interval": "How often",
           "restore_page": "Put the panel back afterwards"
         }
+      },
+      "confirm": {
+        "title": "Add {model}?",
+        "description": "A CTC display was found at {host}. Setting it up walks the unit's menu to see what it can report, so the panel will move for a moment."
       }
     },
     "error": {
