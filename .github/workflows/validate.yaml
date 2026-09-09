@@ -14,7 +14,16 @@ jobs:
       - uses: home-assistant/actions/hassfest@master
 
   hacs:
+    name: HACS validation
     runs-on: ubuntu-latest
+    # The HACS action fetches hacs.json/manifest through the GitHub API, which
+    # fails while this repository is private (HACS cannot install private repos
+    # either). Skipped rather than merely non-blocking, so a red X here cannot
+    # be mistaken for a real failure. Both lines disappear on their own the day
+    # the repo goes public, and then the topics, the brand icon and a release
+    # are what is left to do (see beolink/ha-intellipool for the full round).
+    if: ${{ !github.event.repository.private }}
+    continue-on-error: true
     steps:
       - uses: actions/checkout@v4
       - uses: hacs/action@main
