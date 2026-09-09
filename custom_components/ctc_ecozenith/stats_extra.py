@@ -147,6 +147,7 @@ def build_extra(
     display_firmware: Any = None,
     heatpump_firmware: Any = None,
     control_firmware: Any = None,
+    cop_day: Any = None,
     cop_year: Any = None,
     cop_lifetime: Any = None,
 ) -> dict[str, Any]:
@@ -192,6 +193,7 @@ def build_extra(
     made = serial_made(serial)
     product = serial_product(serial)
     metrics = {
+        "cop_day": cop_value(cop_day),
         "cop_year": cop_value(cop_year),
         "cop_lifetime": cop_value(cop_lifetime),
         "built_year": 2000 + int(made[:2]) if made else None,

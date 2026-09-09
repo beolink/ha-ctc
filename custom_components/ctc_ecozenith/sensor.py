@@ -91,8 +91,8 @@ async def async_setup_entry(
             entities.append(CtcIdentitySensor(runtime, key, name, value, icon))
 
     if runtime.cop is not None:
-        entities.append(CtcCopSensor(runtime, yearly=True))
-        entities.append(CtcCopSensor(runtime, yearly=False))
+        for span in ("day", "year", "lifetime"):
+            entities.append(CtcCopSensor(runtime, span))
 
     async_add_entities(entities)
 
@@ -215,31 +215,38 @@ class CtcCopSensor(CoordinatorEntity, SensorEntity):
     _attr_icon = "mdi:gauge"
     _attr_suggested_display_precision = 2
 
-    def __init__(self, runtime, yearly: bool) -> None:
+    NAMES = {
+        "day": "Dygnsvärmefaktor",
+        "year": "Årsvärmefaktor",
+        "lifetime": "Värmefaktor, hela livslängden",
+    }
+
+    def __init__(self, runtime, span: str) -> None:
         super().__init__(runtime.web)
         self._runtime = runtime
-        self._yearly = yearly
+        self._span = span
         host = next(iter(runtime.device["identifiers"]))[1]
-        key = "cop_year" if yearly else "cop_lifetime"
-        self._attr_unique_id = f"{DOMAIN}_{host}_{key}"
-        self._attr_name = "Årsvärmefaktor" if yearly else "Värmefaktor, hela livslängden"
+        self._attr_unique_id = f"{DOMAIN}_{host}_cop_{span}"
+        self._attr_name = self.NAMES[span]
         self._attr_device_info = runtime.device
 
     def _result(self):
         out, consumed = current_totals(self._runtime)
+        if self._span == "day":
+            return self._runtime.cop.result_day(out, consumed)
         return self._runtime.cop.result(out, consumed)
 
     @property
     def native_value(self) -> float | None:
-        result = self._result()
-        if self._yearly:
-            # Reporting the lifetime figure under a yearly name would be a
-            # different number wearing the wrong label.
-            return result.value if result.basis == "year" else None
         out, consumed = current_totals(self._runtime)
-        if out is None or consumed is None or consumed < 50:
-            return None
-        return round(out / consumed, 2)
+        if self._span == "lifetime":
+            if out is None or consumed is None or consumed < 50:
+                return None
+            return round(out / consumed, 2)
+        result = self._result()
+        # Reporting one span's figure under another span's name would be a
+        # different number wearing the wrong label.
+        return result.value if result.basis == self._span else None
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:

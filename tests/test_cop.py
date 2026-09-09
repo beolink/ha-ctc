@@ -150,3 +150,77 @@ def test_a_serial_that_is_not_one_gives_no_date(identity):
     assert identity.Identity(serial="7208").manufactured is None
     assert identity.Identity(serial=None).manufactured is None
     assert identity.Identity(serial="720825998489").manufactured is None
+
+
+# ------------------------------------------------------------- dygnsvärdet
+
+from datetime import datetime, timezone
+
+
+def test_daily_figure_uses_a_sample_from_yesterday(cop):
+    tracker = cop.CopTracker(FakeStore())
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(22400, 9100, now=now - timedelta(hours=24)))
+    result = tracker.result_day(22440, 9112, now=now)
+    assert result.basis == "day"
+    assert result.value == pytest.approx(40 / 12, abs=0.01)
+    assert result.energy_out == pytest.approx(40, abs=0.1)
+
+
+def test_a_sample_that_is_too_fresh_is_not_yesterday(cop):
+    # Dividing two small integers a few hours apart swings wildly.
+    tracker = cop.CopTracker(FakeStore())
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(22400, 9100, now=now - timedelta(hours=6)))
+    assert tracker.result_day(22440, 9112, now=now).value is None
+
+
+def test_a_sample_that_is_too_old_is_not_yesterday_either(cop):
+    tracker = cop.CopTracker(FakeStore())
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(22400, 9100, now=now - timedelta(hours=48)))
+    assert tracker.result_day(22440, 9112, now=now).value is None
+
+
+def test_a_still_day_gives_no_daily_figure(cop):
+    # A day the pump barely ran divides almost nothing by almost nothing.
+    tracker = cop.CopTracker(FakeStore())
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(22400, 9100, now=now - timedelta(hours=24)))
+    assert tracker.result_day(22402, 9101, now=now).value is None
+
+
+def test_a_counter_reset_gives_no_daily_figure(cop):
+    tracker = cop.CopTracker(FakeStore())
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(30000, 12000, now=now - timedelta(hours=24)))
+    assert tracker.result_day(100, 40, now=now).value is None
+
+
+def test_the_daily_run_is_pruned_but_the_yearly_map_is_not(cop):
+    store = FakeStore()
+    tracker = cop.CopTracker(store)
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(tracker.async_record(20000, 8000, now=now - timedelta(days=10)))
+    run(tracker.async_record(22440, 9112, now=now))
+    assert len(store.data["recent"]) == 1
+    assert len(store.data["samples"]) == 2
+
+
+def test_the_daily_run_survives_a_restart(cop):
+    store = FakeStore()
+    now = datetime(2026, 9, 10, 12, 0, tzinfo=timezone.utc)
+    run(cop.CopTracker(store).async_record(22400, 9100, now=now - timedelta(hours=24)))
+    revived = cop.CopTracker(store)
+    run(revived.async_load())
+    assert revived.result_day(22440, 9112, now=now).basis == "day"
+    assert revived.result_day(22440, 9112, now=now).value is not None
+
+
+def test_an_old_store_without_the_daily_run_still_loads(cop):
+    store = FakeStore()
+    store.data = {"samples": {"2026-09-09": [22400.0, 9100.0]}}
+    tracker = cop.CopTracker(store)
+    run(tracker.async_load())
+    assert tracker.result_day(22440, 9112).value is None
+    assert tracker.result(22440, 9112).basis == "lifetime"

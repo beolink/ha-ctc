@@ -68,22 +68,25 @@ def current_totals(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
     return out, consumed
 
 
-def cop_for_report(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
-    """Return the rolling yearly figure and the lifetime one.
+def cop_for_report(
+    runtime: "CtcRuntime",
+) -> tuple[float | None, float | None, float | None]:
+    """Return the figures over a day, a rolling year and the whole lifetime.
 
-    The yearly figure is only returned once a full year of samples stands
-    behind it. Sending the lifetime figure under a yearly name would be a
-    different number wearing the wrong label.
+    Each is only returned when it actually stands on its own span. Sending the
+    lifetime figure under a yearly name would be a different number wearing the
+    wrong label.
     """
     if runtime.cop is None:
-        return None, None
+        return None, None, None
     out, consumed = current_totals(runtime)
     result = runtime.cop.result(out, consumed)
     yearly = result.value if result.basis == "year" else None
+    daily = runtime.cop.result_day(out, consumed).value
     lifetime = None
     if out is not None and consumed is not None and consumed >= 50:
         lifetime = round(out / consumed, 2)
-    return yearly, lifetime
+    return daily, yearly, lifetime
 
 
 @dataclass
@@ -223,7 +226,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     failures = ErrorCounter()
 
     def _stats_extra() -> dict[str, Any]:
-        cop_year, cop_lifetime = cop_for_report(runtime)
+        cop_day, cop_year, cop_lifetime = cop_for_report(runtime)
         return build_extra(
             entry.data.get("model"),
             has_display=runtime.web is not None,
@@ -235,6 +238,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
             display_firmware=runtime.identity.display_firmware,
             heatpump_firmware=runtime.identity.heatpump_firmware,
             control_firmware=(runtime.modbus.data or {}).get("control_sw"),
+            cop_day=cop_day,
             cop_year=cop_year,
             cop_lifetime=cop_lifetime,
         )

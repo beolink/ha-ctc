@@ -105,8 +105,8 @@ display pages are harvested and how many register reads failed.
 It also sends what the installation is made of and how well it performs: the
 indoor unit's model, the outdoor unit's model, the firmware in the display, in
 the heat pump's control board and in the control unit, the week the machine was
-built, and its coefficient of performance over a rolling year and over its
-lifetime.
+built, and its coefficient of performance over the last day, over a rolling
+year and over its lifetime.
 
 CTC writes a serial number as three groups of four digits: which product it is,
 the year and week it was made, and a sequence number. The first two groups are
