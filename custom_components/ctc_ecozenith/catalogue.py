@@ -349,22 +349,81 @@ async def _async_explore(
     visited: set[int],
     max_taps: int = 26,
 ) -> None:
-    """Tap every plausible control on the root page once and note where it goes."""
-    targets = await _async_tap_targets(client, page_map, root)
-    taps = 0
-    for x, y in targets:
+    """Tap what looks like a control, note where it leads, and go one deeper.
+
+    One level is not always enough. An i255 puts every operation data page one
+    tap from the root, an i550 Pro hides the heat pump's own page behind a
+    second tab strip, and that page is the one carrying the model, the control
+    board's firmware and the delivered heat.
+    """
+    taps = await _async_tap_pages(client, page_map, root, root, into, visited, max_taps)
+
+    # Second level: pages found above that carry a strip of their own.
+    for page in [p.page for p in list(into) if p.page != root]:
         if taps >= max_taps:
             break
-        here = await client.async_current_page()
-        if here != root and not await _async_return_to_root(client, page_map, root):
+        if not await _async_return_to_root(client, page_map, root):
             break
-        taps += 1
-        await client.async_click(page_map.get(root, []), x, y)
-        landed = await client.async_current_page()
-        if landed == root or landed in visited:
+        before = await client.async_current_page()
+        route = next((p.route for p in into if p.page == page), [])
+        for x, y in route:
+            await client.async_click(page_map.get(await client.async_current_page(), []), x, y)
+        if await client.async_current_page() != page:
             continue
-        await _async_collect(client, page_map, landed, into, visited, [(x, y)])
+        taps += await _async_tap_pages(
+            client, page_map, page, root, into, visited, max_taps - taps, route
+        )
     await _async_return_to_root(client, page_map, root)
+
+
+async def _async_tap_pages(
+    client: CtcWebClient,
+    page_map: dict[int, list[int]],
+    page: int,
+    root: int,
+    into: list[SlowPage],
+    visited: set[int],
+    budget: int,
+    prefix: list[tuple[int, int]] | None = None,
+) -> int:
+    """Tap every target on one page, recording where each tap led."""
+    targets = await _async_tap_targets(client, page_map, page)
+    taps = 0
+    for x, y in targets:
+        if taps >= budget:
+            break
+        here = await client.async_current_page()
+        if here != page:
+            # Getting back may fail on one target without the rest being lost,
+            # so this carries on rather than giving up on the whole page.
+            if not await _async_return_to(client, page_map, root, page, prefix):
+                continue
+        taps += 1
+        await client.async_click(page_map.get(page, []), x, y)
+        landed = await client.async_current_page()
+        if landed == page or landed in visited:
+            continue
+        await _async_collect(
+            client, page_map, landed, into, visited, list(prefix or []) + [(x, y)]
+        )
+    return taps
+
+
+async def _async_return_to(
+    client: CtcWebClient,
+    page_map: dict[int, list[int]],
+    root: int,
+    page: int,
+    prefix: list[tuple[int, int]] | None,
+) -> bool:
+    """Walk back to a page, through the root when there is a route to replay."""
+    if page == root:
+        return await _async_return_to_root(client, page_map, root)
+    if not await _async_return_to_root(client, page_map, root):
+        return False
+    for x, y in prefix or []:
+        await client.async_click(page_map.get(await client.async_current_page(), []), x, y)
+    return await client.async_current_page() == page
 
 
 async def _async_return_to_root(
