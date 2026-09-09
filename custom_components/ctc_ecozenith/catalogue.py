@@ -304,7 +304,7 @@ async def _async_explore(
     root: int,
     into: list[SlowPage],
     visited: set[int],
-    max_taps: int = 16,
+    max_taps: int = 26,
 ) -> None:
     """Tap every plausible control on the root page once and note where it goes."""
     targets = await _async_tap_targets(client, page_map, root)
@@ -367,8 +367,24 @@ async def _async_tap_targets(
                 continue
             seen.add(box)
             targets.append(box)
-    targets.sort(key=lambda b: (b[1], b[0]))
-    return [(x + w // 2, y + h // 2) for x, y, w, h in targets]
+    return [(x + w // 2, y + h // 2) for x, y, w, h in _order_targets(targets)]
+
+
+def _order_targets(
+    targets: list[tuple[int, int, int, int]]
+) -> list[tuple[int, int, int, int]]:
+    """Try the tab strip first, then everything else.
+
+    A row of equally sized boxes along the bottom is a tab strip, and tabs are
+    what actually lead somewhere. The rest of an operation data page is usually
+    the schematic, worth trying but not worth trying first: spending the tap
+    budget on it is how the history page got missed.
+    """
+    bottom = [b for b in targets if b[1] > 200]
+    widths = {b[2] for b in bottom}
+    tabs = sorted(bottom, key=lambda b: b[0]) if len(bottom) >= 3 and len(widths) <= 2 else []
+    rest = sorted((b for b in targets if b not in tabs), key=lambda b: (b[1], b[0]))
+    return tabs + rest
 
 
 async def _async_back_to(

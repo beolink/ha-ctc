@@ -233,3 +233,22 @@ def test_pacing_does_not_wait_when_the_gap_has_passed(modbus_api):
         return time.monotonic() - started
 
     assert asyncio.run(scenario()) < modbus_api.MESSAGE_WAIT
+
+
+def test_a_tab_strip_is_tried_before_the_rest(catalogue, web_api):
+    # The tabs along the bottom are what lead to the other pages. Trying the
+    # schematic first is how the history page got missed.
+    widget = web_api.Widget
+    widgets = [
+        widget(index=0, kind=1, x=219, y=45, width=116, height=74, visible=True),
+        widget(index=1, kind=1, x=66, y=141, width=79, height=73, visible=True),
+        widget(index=2, kind=0, x=0, y=230, width=83, height=38, visible=True),
+        widget(index=3, kind=0, x=80, y=230, width=83, height=38, visible=True),
+        widget(index=4, kind=0, x=160, y=230, width=83, height=38, visible=True),
+        widget(index=5, kind=0, x=240, y=230, width=83, height=38, visible=True),
+    ]
+    order = catalogue._order_targets(
+        [(w.x, w.y, w.width, w.height) for w in widgets]
+    )
+    assert order[0][1] > 200, "en flik ska provas först"
+    assert order[-1][1] < 200, "schemabilden sist"
