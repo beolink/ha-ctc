@@ -47,7 +47,7 @@ from .const import (
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
 from .identity import Identity, async_read_identity
 from .modbus_api import CtcModbusClient
-from .stats import StatsReporter, async_setup_stats
+from .stats import async_setup_stats, async_stop_stats
 from .stats_extra import ErrorCounter, build_extra
 from .web_api import CtcWebClient
 
@@ -66,6 +66,69 @@ def current_totals(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
     out = data.get(runtime.energy_out.key) if runtime.energy_out else None
     consumed = data.get(runtime.energy_in.key) if runtime.energy_in else None
     return out, consumed
+
+
+_FAILURES: dict[str, ErrorCounter] = {}
+
+
+def _stats_extra_for(hass: HomeAssistant, entry: CtcConfigEntry) -> dict[str, Any]:
+    """The integration's part of the anonymous daily report.
+
+    Resolved when the report is built, not when it is armed: the controller
+    allows a single Modbus client, so a busy or absent controller makes the
+    set-up raise and Home Assistant retries it for as long as that lasts.
+    The report has to say "installed and unreachable" rather than nothing at
+    all. It never opens a connection of its own, it reads what the
+    coordinators already have. See stats_extra.py for exactly what is sent.
+    """
+    runtime = getattr(entry, "runtime_data", None)
+    failures = _FAILURES.setdefault(entry.entry_id, ErrorCounter())
+    if runtime is None:
+        # Set-up has not finished. The model is the one thing the config
+        # knows; a read failure is recorded so a controller that never
+        # answers is visible rather than silent.
+        return build_extra(
+            entry.data.get("model"),
+            has_display=False,
+            control_enabled=False,
+            page_count=0,
+            read_failures=1,
+        )
+    cop_day, cop_year, cop_lifetime = cop_for_report(runtime)
+    return build_extra(
+        entry.data.get("model"),
+        has_display=runtime.web is not None,
+        control_enabled=runtime.control_enabled,
+        page_count=len(runtime.pages),
+        read_failures=failures.delta(runtime.modbus.read_failures),
+        heatpump_model=runtime.identity.heatpump_model,
+        serial=runtime.identity.serial,
+        display_firmware=runtime.identity.display_firmware,
+        heatpump_firmware=runtime.identity.heatpump_firmware,
+        control_firmware=(runtime.modbus.data or {}).get("control_sw"),
+        cop_day=cop_day,
+        cop_year=cop_year,
+        cop_lifetime=cop_lifetime,
+    )
+
+
+async def _async_arm_statistics(hass: HomeAssistant, entry: CtcConfigEntry) -> None:
+    """Arm the daily report before the first Modbus call.
+
+    Home Assistant runs an entry's on-unload callbacks after every failed
+    set-up attempt and retries for as long as the controller stays away, so a
+    reporter armed at the end of a successful set-up goes quiet exactly then.
+    Stopped only from async_unload_entry, which a failed attempt never
+    reaches. On unless the user switches it off in the options.
+    """
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        await async_setup_stats(
+            hass, entry, DOMAIN, str(integration.version),
+            extra=lambda: _stats_extra_for(hass, entry),
+        )
+    except Exception:  # noqa: BLE001 - statistics must never break a set-up
+        _LOGGER.debug("Could not arm the statistics reporter", exc_info=True)
 
 
 def cop_for_report(
@@ -99,7 +162,6 @@ class CtcRuntime:
     web: CtcWebCoordinator | None = None
     pages: list[SlowPage] = field(default_factory=list)
     control_enabled: bool = False
-    stats: StatsReporter | None = None
     identity: Identity = field(default_factory=Identity)
     cop: CopTracker | None = None
     #: The two lifetime counters, once they turn up among the harvested pages.
@@ -117,6 +179,8 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     web_port = entry.data.get(CONF_WEB_PORT, DEFAULT_WEB_PORT)
     slave = entry.data.get(CONF_SLAVE, DEFAULT_SLAVE)
     options = entry.options
+
+    await _async_arm_statistics(hass, entry)
 
     modbus_client = CtcModbusClient(host, modbus_port, slave)
     modbus = CtcModbusCoordinator(
@@ -219,33 +283,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
             async_track_time_interval(hass, _record_cop, COP_SAMPLE_INTERVAL)
         )
 
-    # Anonymous daily report. On unless the user switches it off in the
-    # options, and it never opens a connection of its own: it reads what the
-    # coordinators already have. See stats_extra.py for exactly what is sent.
-    integration = await async_get_integration(hass, DOMAIN)
-    failures = ErrorCounter()
-
-    def _stats_extra() -> dict[str, Any]:
-        cop_day, cop_year, cop_lifetime = cop_for_report(runtime)
-        return build_extra(
-            entry.data.get("model"),
-            has_display=runtime.web is not None,
-            control_enabled=runtime.control_enabled,
-            page_count=len(runtime.pages),
-            read_failures=failures.delta(modbus.read_failures),
-            heatpump_model=runtime.identity.heatpump_model,
-            serial=runtime.identity.serial,
-            display_firmware=runtime.identity.display_firmware,
-            heatpump_firmware=runtime.identity.heatpump_firmware,
-            control_firmware=(runtime.modbus.data or {}).get("control_sw"),
-            cop_day=cop_day,
-            cop_year=cop_year,
-            cop_lifetime=cop_lifetime,
-        )
-
-    runtime.stats = await async_setup_stats(
-        hass, entry, DOMAIN, str(integration.version), extra=_stats_extra
-    )
     return True
 
 
@@ -258,8 +295,9 @@ async def async_unload_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool
     unloaded = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
     if unloaded:
         runtime = entry.runtime_data
-        if runtime.stats:
-            await runtime.stats.async_stop()
+        # Only here, never from an on-unload callback: those also run when a
+        # set-up attempt fails, and the report has to survive that.
+        await async_stop_stats(hass, entry, DOMAIN)
         await runtime.control.async_stop()
         await runtime.modbus.client.async_close()
     return unloaded

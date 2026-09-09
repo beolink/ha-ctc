@@ -11,6 +11,14 @@ Reporting is on by default and is switched off in the integration's options.
 Switching it off sends one last call that erases everything stored about this
 particular installation.
 
+The reporter is armed once per config entry and kept in ``hass.data``, so it
+outlives a set-up that does not finish. An integration whose device is
+unreachable at start-up raises ConfigEntryNotReady and is retried by Home
+Assistant for as long as the device stays away; if the reporter were tied to
+that attempt, the installation would fall silent exactly while something is
+wrong with it. Arm it before the first call that can raise, and stop it from
+``async_unload_entry`` (which a failed attempt never reaches).
+
 What is collected, and why: https://stats.rnet.se/integritet
 """
 
@@ -39,6 +47,9 @@ SCHEMA_VERSION = 1
 
 #: Option key that controls reporting. On unless the user turns it off.
 OPTION_KEY = "send_statistics"
+
+#: Where the armed reporters live, keyed by (domain, entry_id).
+DATA_KEY = "rnet_stats_reporters"
 
 INTERVAL = timedelta(hours=24)
 FIRST_DELAY = timedelta(minutes=10)
@@ -147,10 +158,24 @@ class StatsReporter:
         self._cancel.append(async_call_later(self.hass, delay, _first))
 
     async def async_stop(self) -> None:
-        """Cancel the timers. Called from async_unload_entry."""
+        """Cancel the timers. Safe to call more than once."""
         for cancel in self._cancel:
             cancel()
         self._cancel.clear()
+
+    @property
+    def armed(self) -> bool:
+        """Whether the timers are running."""
+        return bool(self._cancel)
+
+    def rearm_source(self, version: str, extra=None, name: str | None = None) -> None:
+        """Point an already armed reporter at the current set-up attempt: the
+        callback and the version may have changed since it was armed."""
+        self.version = version
+        if extra is not None:
+            self.extra = extra
+        if name:
+            self.name = name
 
     async def async_payload(self) -> dict[str, Any]:
         """Build the payload. Everything in it is deliberately coarse."""
@@ -249,10 +274,37 @@ async def async_setup_stats(
     extra: Callable[[], dict[str, Any]] | None = None,
     name: str | None = None,
 ) -> StatsReporter:
-    """Create, start and return the reporter."""
+    """Arm the reporter for this entry, or return the one already armed.
+
+    Call it early in ``async_setup_entry``, before the first call that can
+    raise ConfigEntryNotReady. A second call for the same entry (Home
+    Assistant retrying a set-up whose device is unreachable) updates the
+    callback and returns the running reporter instead of arming a second one,
+    so the daily report keeps going out while the device is away.
+
+    The caller must NOT register ``entry.async_on_unload(reporter.async_stop)``:
+    Home Assistant runs those callbacks when a set-up attempt fails, which is
+    the case this is here to survive. Stop it from ``async_unload_entry``
+    with :func:`async_stop_stats` instead.
+    """
+    reporters: dict = hass.data.setdefault(DATA_KEY, {})
+    key = (domain, entry.entry_id)
+    existing: StatsReporter | None = reporters.get(key)
+    if existing is not None and existing.armed:
+        existing.rearm_source(version, extra, name)
+        return existing
     reporter = StatsReporter(hass, entry, domain, version, extra, name=name)
+    reporters[key] = reporter
     await reporter.async_start()
     return reporter
+
+
+async def async_stop_stats(hass: HomeAssistant, entry: ConfigEntry, domain: str) -> None:
+    """Stop and forget the entry's reporter. Call it from
+    ``async_unload_entry``, never from an ``entry.async_on_unload`` callback."""
+    reporter = (hass.data.get(DATA_KEY) or {}).pop((domain, entry.entry_id), None)
+    if reporter is not None:
+        await reporter.async_stop()
 
 
 async def async_forget_install(hass: HomeAssistant, entry: ConfigEntry, domain: str) -> None:
