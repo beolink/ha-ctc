@@ -156,8 +156,15 @@ def build_extra(
     the page names come from the unit's own menu and could carry an installer's
     text.
     """
+    # The outdoor unit belongs in the model list beside the indoor one: the two
+    # together are what an installation actually is.
+    models = [model_slug(model)]
+    outdoor = heatpump_slug(heatpump_model)
+    if outdoor not in ("unknown", "other") and outdoor not in models:
+        models.append(outdoor)
+
     payload: dict[str, Any] = {
-        "models": [model_slug(model)],
+        "models": models,
         "features": {
             # Modbus is always the base transport, the display is optional.
             "modbus": True,
@@ -168,27 +175,31 @@ def build_extra(
         "errors": max(0, int(read_failures)),
     }
 
-    # What the installation is made of, and how well it performs. None of this
-    # identifies anyone: the serial number is deliberately not among it, even
-    # though the integration knows it.
-    hardware = {
-        "heatpump": heatpump_slug(heatpump_model),
-        "product": serial_product(serial),
-        "made": serial_made(serial),
-        "display_fw": firmware_value(display_firmware),
-        "heatpump_fw": firmware_value(heatpump_firmware),
-        "control_fw": control_firmware_value(control_firmware),
+    # The firmware in each board. Three separate versions, because a fault that
+    # only shows up on one combination is exactly what this is for.
+    firmwares = {
+        "display": firmware_value(display_firmware),
+        "heatpump": firmware_value(heatpump_firmware),
+        "control": control_firmware_value(control_firmware),
     }
-    hardware = {k: v for k, v in hardware.items() if v is not None and v != "unknown"}
-    if hardware:
-        payload["hardware"] = hardware
+    firmwares = {k: str(v) for k, v in firmwares.items() if v is not None}
+    if firmwares:
+        payload["firmwares"] = firmwares
 
-    performance = {
+    # Numbers go where the backend already keeps numbers. The build week comes
+    # from the serial number's middle group; the group that identifies the
+    # machine itself is never touched.
+    made = serial_made(serial)
+    product = serial_product(serial)
+    metrics = {
         "cop_year": cop_value(cop_year),
         "cop_lifetime": cop_value(cop_lifetime),
+        "built_year": 2000 + int(made[:2]) if made else None,
+        "built_week": int(made[2:]) if made else None,
+        "product_code": int(product) if product else None,
     }
-    performance = {k: v for k, v in performance.items() if v is not None}
-    if performance:
-        payload["performance"] = performance
+    metrics = {k: v for k, v in metrics.items() if v is not None}
+    if metrics:
+        payload["metrics"] = metrics
 
     return payload

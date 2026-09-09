@@ -35,7 +35,7 @@ from homeassistant.helpers.system_info import async_get_system_info
 _LOGGER = logging.getLogger(__name__)
 
 ENDPOINT = "https://stats.rnet.se/api/v1/report"
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 #: Option key that controls reporting. On unless the user turns it off.
 OPTION_KEY = "send_statistics"
@@ -47,7 +47,7 @@ TIMEOUT = 10
 #: Only these keys may be added by the integration's own extra callback. The
 #: backend rejects anything else, but stopping it here keeps a careless caller
 #: from ever putting house data on the wire in the first place.
-EXTRA_KEYS = ("models", "features", "errors", "metrics", "firmware")
+EXTRA_KEYS = ("models", "features", "errors", "metrics", "firmware", "firmwares")
 
 #: Decimals kept of the position. One decimal is roughly 11 km, which is enough
 #: for climate, price area and a readable map, and far too coarse to point at a

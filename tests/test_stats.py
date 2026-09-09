@@ -166,8 +166,9 @@ def test_payload_omits_what_is_not_known(stats_extra):
         page_count=0,
         read_failures=0,
     )
-    assert "hardware" not in payload
-    assert "performance" not in payload
+    assert "firmwares" not in payload
+    assert "metrics" not in payload
+    assert payload["models"] == ["i255"]
 
 
 def test_payload_carries_hardware_and_performance(stats_extra):
@@ -185,15 +186,19 @@ def test_payload_carries_hardware_and_performance(stats_extra):
         cop_year=3.4,
         cop_lifetime=2.47,
     )
-    assert payload["hardware"] == {
-        "heatpump": "ea720m",
-        "product": "7208",
-        "made": "2540",
-        "display_fw": "20260610",
-        "heatpump_fw": "20260522",
-        "control_fw": 925,
+    assert payload["models"] == ["i255", "ea720m"]
+    assert payload["firmwares"] == {
+        "display": "20260610",
+        "heatpump": "20260522",
+        "control": "925",
     }
-    assert payload["performance"] == {"cop_year": 3.4, "cop_lifetime": 2.47}
+    assert payload["metrics"] == {
+        "cop_year": 3.4,
+        "cop_lifetime": 2.47,
+        "built_year": 2025,
+        "built_week": 40,
+        "product_code": 7208,
+    }
 
 
 def test_payload_never_carries_a_full_serial(stats_extra):
@@ -206,6 +211,6 @@ def test_payload_never_carries_a_full_serial(stats_extra):
         serial="720825408489",
     )
     assert "720825408489" not in repr(payload)
-    assert "8489" not in repr(payload)
-    assert payload["hardware"]["product"] == "7208"
-    assert payload["hardware"]["made"] == "2540"
+    assert payload["metrics"]["product_code"] == 7208
+    assert payload["metrics"]["built_year"] == 2025
+    assert payload["metrics"]["built_week"] == 40
