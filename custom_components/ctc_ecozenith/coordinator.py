@@ -116,6 +116,8 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         pages: list[SlowPage],
         interval: int,
         restore_page: bool = True,
+        home_page: int | None = None,
+        on_home_page_found: Any = None,
     ) -> None:
         super().__init__(
             hass,
@@ -126,6 +128,11 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.client = client
         self.pages = pages
         self.restore_page = restore_page
+        #: The page the panel was showing before this integration first touched
+        #: it. Kept across restarts so that one failed restore cannot make the
+        #: wrong page the new normal.
+        self.home_page = home_page
+        self._on_home_page_found = on_home_page_found
         self._expected_page: int | None = None
         self.last_skip_reason: str | None = None
 
@@ -150,7 +157,20 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             return data
         self.last_skip_reason = None
 
-        restore_to = origin if self.restore_page else None
+        if self.home_page is None and origin not in {p.page for p in self.pages}:
+            # First time in: whatever the panel was showing is where it belongs.
+            self.home_page = origin
+            if self._on_home_page_found is not None:
+                self._on_home_page_found(origin)
+
+        restore_to = None
+        if self.restore_page:
+            # Restoring to the page this cycle started on is right until a
+            # restore fails, after which that wrong page would become the new
+            # reference. The remembered home page breaks that loop.
+            restore_to = origin
+            if origin in {p.page for p in self.pages} and self.home_page is not None:
+                restore_to = self.home_page
         try:
             for page in self.pages:
                 if await self.client.async_current_page() != page.page:
@@ -176,7 +196,7 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         finally:
             if restore_to is not None:
                 try:
-                    await self.client.async_goto_page(restore_to)
+                    await self._async_restore(restore_to)
                 except CtcWebError:
                     _LOGGER.debug("Could not restore the panel to page %s", restore_to)
             try:
@@ -187,6 +207,27 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not data:
             raise UpdateFailed("no value could be read from the display")
         return data
+
+    async def _async_restore(self, target: int) -> bool:
+        """Put the panel back, trying every way in that is known.
+
+        A recorded route is the surest, stepping back works inside a submenu,
+        and the home screen is the last resort so the panel is at least left
+        somewhere sensible rather than deep in a menu.
+        """
+        route = next((p.route for p in self.pages if p.page == target and p.route), None)
+        if await self.client.async_goto_page(target, route):
+            return True
+        if await self.client.async_step_back_to(target):
+            return True
+        if self.home_page is not None and target != self.home_page:
+            home_route = next(
+                (p.route for p in self.pages if p.page == self.home_page and p.route), None
+            )
+            if await self.client.async_goto_page(self.home_page, home_route):
+                return True
+        await self.client.async_goto_home()
+        return await self.client.async_current_page() == target
 
 
 class CtcControlManager:

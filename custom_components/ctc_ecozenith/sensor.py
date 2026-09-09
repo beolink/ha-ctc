@@ -21,7 +21,9 @@ from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from . import CtcConfigEntry
+from homeassistant.const import EntityCategory
+
+from . import CtcConfigEntry, current_totals
 from .const import DOMAIN, ModbusSensor, SlowValue
 
 DEVICE_CLASSES = {
@@ -75,6 +77,23 @@ async def async_setup_entry(
         for page in runtime.pages:
             for value in page.values:
                 entities.append(CtcDisplaySensor(runtime, page.title, value))
+
+    # What the unit is: read once from the display and then unchanging.
+    for key, name, value, icon in (
+        ("hp_model", "Värmepumpsmodell", runtime.identity.heatpump_model, "mdi:heat-pump-outline"),
+        ("display_fw", "Programversion display", runtime.identity.display_firmware, "mdi:chip"),
+        ("hp_fw", "Programversion VP-styrkort", runtime.identity.heatpump_firmware, "mdi:chip"),
+        ("bootloader", "Bootloaderversion", runtime.identity.bootloader, "mdi:chip"),
+        ("serial", "Serienummer", runtime.identity.serial, "mdi:identifier"),
+        ("made", "Tillverkad", runtime.identity.manufactured, "mdi:factory"),
+    ):
+        if value:
+            entities.append(CtcIdentitySensor(runtime, key, name, value, icon))
+
+    if runtime.cop is not None:
+        entities.append(CtcCopSensor(runtime, yearly=True))
+        entities.append(CtcCopSensor(runtime, yearly=False))
+
     async_add_entities(entities)
 
 
@@ -163,3 +182,69 @@ class CtcDisplaySensor(CoordinatorEntity, SensorEntity):
             "sida": str(self._value.page),
             "skärm": str(self._value.screen),
         }
+
+
+class CtcIdentitySensor(SensorEntity):
+    """Something the unit says about itself and then never changes.
+
+    Read from the display once at setup and stored with the entry, so it costs
+    nothing to keep and survives the display being unreachable.
+    """
+
+    _attr_has_entity_name = True
+    _attr_entity_category = EntityCategory.DIAGNOSTIC
+    _attr_entity_registry_enabled_default = False
+
+    def __init__(self, runtime, key: str, name: str, value: str, icon: str) -> None:
+        host = next(iter(runtime.device["identifiers"]))[1]
+        self._attr_unique_id = f"{DOMAIN}_{host}_{key}"
+        self._attr_name = name
+        self._attr_native_value = value
+        self._attr_icon = icon
+        self._attr_device_info = runtime.device
+
+
+class CtcCopSensor(CoordinatorEntity, SensorEntity):
+    """Delivered heat against supplied energy.
+
+    Modbus knows what went in but never what came out, so this exists only
+    where the display's history page is harvested.
+    """
+
+    _attr_has_entity_name = True
+    _attr_icon = "mdi:gauge"
+    _attr_suggested_display_precision = 2
+
+    def __init__(self, runtime, yearly: bool) -> None:
+        super().__init__(runtime.web)
+        self._runtime = runtime
+        self._yearly = yearly
+        host = next(iter(runtime.device["identifiers"]))[1]
+        key = "cop_year" if yearly else "cop_lifetime"
+        self._attr_unique_id = f"{DOMAIN}_{host}_{key}"
+        self._attr_name = "Årsvärmefaktor" if yearly else "Värmefaktor, hela livslängden"
+        self._attr_device_info = runtime.device
+
+    def _result(self):
+        out, consumed = current_totals(self._runtime)
+        return self._runtime.cop.result(out, consumed)
+
+    @property
+    def native_value(self) -> float | None:
+        result = self._result()
+        if self._yearly:
+            # Reporting the lifetime figure under a yearly name would be a
+            # different number wearing the wrong label.
+            return result.value if result.basis == "year" else None
+        out, consumed = current_totals(self._runtime)
+        if out is None or consumed is None or consumed < 50:
+            return None
+        return round(out / consumed, 2)
+
+    @property
+    def extra_state_attributes(self) -> dict[str, object]:
+        return self._result().as_attributes()
+
+    @property
+    def available(self) -> bool:
+        return self.coordinator.last_update_success and self.native_value is not None

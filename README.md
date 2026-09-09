@@ -102,9 +102,20 @@ approximate position rounded to about 11 km, how many entities the integration
 created, which transports are in use, whether control is enabled, how many
 display pages are harvested and how many register reads failed.
 
-It never sends a name, an address, an exact position, a serial number, an entity
-name, a page name or a single measurement from the house, and your IP address is
-not stored or used to guess where you are. The position is rounded inside your
+It also sends what the installation is made of and how well it performs: the
+indoor unit's model, the outdoor unit's model, the firmware in the display, in
+the heat pump's control board and in the control unit, the week the machine was
+built, and its coefficient of performance over a rolling year and over its
+lifetime.
+
+CTC writes a serial number as three groups of four digits: which product it is,
+the year and week it was made, and a sequence number. The first two groups are
+sent, because they describe a production run. **The sequence number, which is
+what identifies your particular machine, is not sent.**
+
+It never sends a name, an address, an exact position, a full serial number, an
+entity name, a page name or a single measurement from the house, and your IP
+address is not stored or used to guess where you are. The position is rounded inside your
 own installation before anything is sent, and rounded again on the server, so a
 finer value does not exist in the database. Reports are stored per date, never per
 time of day, so they cannot show when anyone is home. What the backend accepts

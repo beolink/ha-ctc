@@ -59,6 +59,24 @@ WEB_MAX_CONCURRENCY: Final = 3
 
 PLATFORMS: Final = ["sensor", "binary_sensor", "number", "select"]
 
+CONF_READ_TOTALS: Final = "read_totals"
+CONF_IDENTITY: Final = "identity"
+
+#: English labels of the two lifetime counters that make a coefficient of
+#: performance possible at all. Modbus carries the consumption side but not the
+#: delivered side, so both have to come from the display.
+LABEL_ENERGY_OUT_EN: Final = "Energy output total"
+LABEL_ENERGY_IN_EN: Final = "Energy consumption total"
+
+#: Swedish equivalents, matched when the panel is not set to English.
+LABEL_ENERGY_OUT_SV: Final = "Avgiven värme totalt"
+LABEL_ENERGY_IN_SV: Final = "Tillförd energi totalt"
+
+#: A year of daily samples, plus a margin so the oldest one is still there when
+#: the newest arrives.
+COP_HISTORY_DAYS: Final = 400
+COP_WINDOW_DAYS: Final = 365
+
 
 @dataclass(frozen=True)
 class ModbusSensor:
@@ -171,6 +189,10 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
     # Pump and fan speeds carry one decimal: an EcoAir 720M running at 66.2 per
     # cent reports 662, which read as a whole number would be nonsense.
     ModbusSensor("sg_mode", 62301, "SmartGrid-läge", 1, None, None, None, enum=SG_MODE),
+    # The control unit's own software, which CTC reports as a number and a year
+    # in two neighbouring registers. Diagnostics, so no state class.
+    ModbusSensor("control_sw", 62244, "Programversion styrenhet", 1, None, None, None),
+    ModbusSensor("control_sw_year", 62245, "Programversion styrenhet, år", 1, None, None, None, enabled_default=False),
     # 62331 is documented as supplied power per heat pump. On an i550 Pro it
     # reads 65.5 with the compressor stopped, which cannot be kilowatts, so it
     # is off by default until it can be confirmed on a running unit.

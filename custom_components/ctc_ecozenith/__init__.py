@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -18,10 +19,14 @@ from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.loader import async_get_integration
 
+from homeassistant.helpers.storage import Store
+
 from .catalogue import pages_from_storage
+from .cop import CopTracker, find_energy_totals
 from .const import (
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
+    CONF_IDENTITY,
     CONF_LANGUAGE,
     CONF_MODBUS_PORT,
     CONF_RESTORE_PAGE,
@@ -40,12 +45,45 @@ from .const import (
     SlowPage,
 )
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
+from .identity import Identity, async_read_identity
 from .modbus_api import CtcModbusClient
 from .stats import StatsReporter, async_setup_stats
 from .stats_extra import ErrorCounter, build_extra
 from .web_api import CtcWebClient
 
 _LOGGER = logging.getLogger(__name__)
+
+#: How often the two lifetime counters are written down. Only one sample a day
+#: is kept, so this is about not missing a day rather than about resolution.
+COP_SAMPLE_INTERVAL = timedelta(hours=6)
+
+
+def current_totals(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
+    """The two lifetime counters as the display last reported them."""
+    if runtime.web is None:
+        return None, None
+    data = runtime.web.data or {}
+    out = data.get(runtime.energy_out.key) if runtime.energy_out else None
+    consumed = data.get(runtime.energy_in.key) if runtime.energy_in else None
+    return out, consumed
+
+
+def cop_for_report(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
+    """Return the rolling yearly figure and the lifetime one.
+
+    The yearly figure is only returned once a full year of samples stands
+    behind it. Sending the lifetime figure under a yearly name would be a
+    different number wearing the wrong label.
+    """
+    if runtime.cop is None:
+        return None, None
+    out, consumed = current_totals(runtime)
+    result = runtime.cop.result(out, consumed)
+    yearly = result.value if result.basis == "year" else None
+    lifetime = None
+    if out is not None and consumed is not None and consumed >= 50:
+        lifetime = round(out / consumed, 2)
+    return yearly, lifetime
 
 
 @dataclass
@@ -59,6 +97,11 @@ class CtcRuntime:
     pages: list[SlowPage] = field(default_factory=list)
     control_enabled: bool = False
     stats: StatsReporter | None = None
+    identity: Identity = field(default_factory=Identity)
+    cop: CopTracker | None = None
+    #: The two lifetime counters, once they turn up among the harvested pages.
+    energy_out: Any | None = None
+    energy_in: Any | None = None
 
 
 type CtcConfigEntry = ConfigEntry[CtcRuntime]
@@ -87,13 +130,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         await modbus_client.async_close()
         raise
 
+    web_client = CtcWebClient(
+        async_get_clientsession(hass),
+        host,
+        web_port,
+        int(options.get(CONF_LANGUAGE, LANG_SWEDISH)),
+    )
+
+    # What the unit is, rather than what it is doing. Static, so it is read once
+    # and kept: the panel writes it into its own screens and never changes it.
+    identity = Identity.from_dict(options.get(CONF_IDENTITY))
+    if identity.is_empty:
+        try:
+            identity = await async_read_identity(web_client)
+        except Exception as err:  # noqa: BLE001 - identity is nice to have
+            _LOGGER.debug("Could not read the unit's identity: %s", err)
+        if not identity.is_empty:
+            hass.config_entries.async_update_entry(
+                entry, options={**options, CONF_IDENTITY: identity.as_dict()}
+            )
+
+    model = entry.data.get("model", "CTC")
     device = DeviceInfo(
         identifiers={(DOMAIN, host)},
         manufacturer="CTC / Enertech",
-        model=entry.data.get("model", "CTC"),
+        model=f"{model} + {identity.heatpump_model}" if identity.heatpump_model else model,
         # The device name becomes the prefix of every entity id, so it stays
         # short. The entry title keeps the address for telling two units apart.
-        name=f"CTC {entry.data.get('model', 'värmepump')}",
+        name=f"CTC {model}",
+        serial_number=identity.serial,
+        sw_version=identity.display_firmware,
+        hw_version=identity.bootloader,
         configuration_url=f"http://{host}:{web_port}/main.html",
     )
 
@@ -102,16 +169,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         control=CtcControlManager(hass, modbus_client),
         device=device,
         control_enabled=bool(options.get(CONF_ENABLE_CONTROL, False)),
+        identity=identity,
     )
 
     pages = pages_from_storage(options.get(CONF_SLOW_PAGES, []))
     if pages:
-        web_client = CtcWebClient(
-            async_get_clientsession(hass),
-            host,
-            web_port,
-            int(options.get(CONF_LANGUAGE, LANG_SWEDISH)),
-        )
         web = CtcWebCoordinator(
             hass,
             web_client,
@@ -124,6 +186,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         await web.async_refresh()
         runtime.web = web
         runtime.pages = pages
+        runtime.energy_out, runtime.energy_in = find_energy_totals(pages)
+        if runtime.energy_out is not None and runtime.energy_in is not None:
+            runtime.cop = CopTracker(
+                Store(hass, 1, f"{DOMAIN}_{entry.entry_id}_cop")
+            )
+            await runtime.cop.async_load()
 
     entry.runtime_data = runtime
     try:
@@ -133,6 +201,21 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         raise
     entry.async_on_unload(entry.add_update_listener(_async_reload))
 
+    if runtime.cop is not None:
+        from homeassistant.helpers.event import async_track_time_interval
+
+        async def _record_cop(_now=None) -> None:
+            out, consumed = current_totals(runtime)
+            try:
+                await runtime.cop.async_record(out, consumed)  # type: ignore[union-attr]
+            except Exception as err:  # noqa: BLE001 - a missed sample is not fatal
+                _LOGGER.debug("Could not write down the energy counters: %s", err)
+
+        await _record_cop()
+        entry.async_on_unload(
+            async_track_time_interval(hass, _record_cop, COP_SAMPLE_INTERVAL)
+        )
+
     # Anonymous daily report. On unless the user switches it off in the
     # options, and it never opens a connection of its own: it reads what the
     # coordinators already have. See stats_extra.py for exactly what is sent.
@@ -140,12 +223,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     failures = ErrorCounter()
 
     def _stats_extra() -> dict[str, Any]:
+        cop_year, cop_lifetime = cop_for_report(runtime)
         return build_extra(
             entry.data.get("model"),
             has_display=runtime.web is not None,
             control_enabled=runtime.control_enabled,
             page_count=len(runtime.pages),
             read_failures=failures.delta(modbus.read_failures),
+            heatpump_model=runtime.identity.heatpump_model,
+            serial=runtime.identity.serial,
+            display_firmware=runtime.identity.display_firmware,
+            heatpump_firmware=runtime.identity.heatpump_firmware,
+            control_firmware=(runtime.modbus.data or {}).get("control_sw"),
+            cop_year=cop_year,
+            cop_lifetime=cop_lifetime,
         )
 
     runtime.stats = await async_setup_stats(

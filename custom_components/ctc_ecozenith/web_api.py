@@ -66,6 +66,10 @@ class Widget:
     label: str | None = None
     value_fmt: str | None = None
     value_vars: list[int] | None = None
+    #: Content of a string element (widget kind 5). The panel uses these for the
+    #: serial number, the MAC address and the firmware versions, which are
+    #: written once and therefore readable whatever page the panel is showing.
+    text_value: str | None = None
 
     @property
     def centre(self) -> tuple[int, int]:
@@ -374,6 +378,26 @@ class CtcWebClient:
                 return -1
             return var_value(definition.v0[index * 2], definition.v0[index * 2 + 1])
 
+        def raw_ref(index: int) -> str | None:
+            """Resolve a reference without forcing it to a number.
+
+            Geometry is always numeric, but a string element points at a text
+            variable, and coercing that to an integer would throw the content
+            away.
+            """
+            if index * 2 >= len(definition.v0):
+                return None
+            kind, val = definition.v0[index * 2], definition.v0[index * 2 + 1]
+            if kind == 0:
+                got = globals_[val] if val < len(globals_) else None
+            elif kind == 1:
+                got = values[val] if val < len(values) else None
+            else:
+                got = val
+            if got is None or got == "":
+                return None
+            return str(got)
+
         widgets: list[Widget] = []
         for order, entry in enumerate(definition.c1):
             if not isinstance(entry, list) or len(entry) < 9:
@@ -387,6 +411,14 @@ class CtcWebClient:
                 height=ref(entry[5]),
                 visible=ref(entry[8]) != 0,
             )
+            # A string element keeps its content where the others keep their
+            # text array index, and it is resolved the same way the geometry is.
+            if widget.kind == 5:
+                if len(entry) > 12 and isinstance(entry[12], int):
+                    widget.text_value = raw_ref(entry[12])
+                widgets.append(widget)
+                continue
+
             # Images carry their text array index at position 10, text elements
             # at position 12. Other widget kinds carry none.
             if widget.kind in (0, 1):

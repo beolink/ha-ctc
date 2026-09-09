@@ -91,3 +91,121 @@ def test_error_counter_survives_a_reload(stats_extra):
     counter = stats_extra.ErrorCounter()
     counter.delta(12)
     assert counter.delta(2) == 2
+
+
+# --------------------------------------------------- hårdvara och prestanda
+
+
+def test_heatpump_slug_accepts_ctc_shapes(stats_extra):
+    assert stats_extra.heatpump_slug("EA720M") == "ea720m"
+    assert stats_extra.heatpump_slug("EP612M") == "ep612m"
+    assert stats_extra.heatpump_slug("EA614") == "ea614"
+
+
+def test_heatpump_slug_refuses_free_text(stats_extra):
+    # A name the installer typed must never reach the database.
+    assert stats_extra.heatpump_slug("Villan hos Andrei") == "other"
+    assert stats_extra.heatpump_slug("EA720M; DROP TABLE") == "other"
+    assert stats_extra.heatpump_slug("") == "unknown"
+    assert stats_extra.heatpump_slug(None) == "unknown"
+
+
+def test_serial_splits_into_product_and_build_week(stats_extra):
+    # CTC's own example: 7312-1712-0719 is an EcoAir 510M from 2017 week 12.
+    assert stats_extra.serial_product("731217120719") == "7312"
+    assert stats_extra.serial_made("731217120719") == "1712"
+    assert stats_extra.serial_product("720825408489") == "7208"
+    assert stats_extra.serial_made("720825408489") == "2540"
+
+
+def test_serial_needs_all_three_groups(stats_extra):
+    assert stats_extra.serial_product("7208") is None
+    assert stats_extra.serial_made("72082540") is None
+    assert stats_extra.serial_product(None) is None
+
+
+def test_an_impossible_week_is_not_a_build_date(stats_extra):
+    assert stats_extra.serial_made("720825998489") is None
+    assert stats_extra.serial_made("720825008489") is None
+
+
+def test_the_sequence_number_never_leaves(stats_extra):
+    full = "720825408489"
+    reported = f"{stats_extra.serial_product(full)}{stats_extra.serial_made(full)}"
+    assert "8489" not in reported
+
+
+def test_firmware_must_be_a_date(stats_extra):
+    assert stats_extra.firmware_value("20260610") == "20260610"
+    assert stats_extra.firmware_value(20260522) == "20260522"
+    assert stats_extra.firmware_value("2.1") is None
+    assert stats_extra.firmware_value("hej") is None
+    assert stats_extra.firmware_value(None) is None
+
+
+def test_control_firmware_is_a_plain_number(stats_extra):
+    assert stats_extra.control_firmware_value(925) == 925
+    assert stats_extra.control_firmware_value("925") == 925
+    assert stats_extra.control_firmware_value(0) is None
+    assert stats_extra.control_firmware_value("x") is None
+
+
+def test_cop_rejects_impossible_values(stats_extra):
+    assert stats_extra.cop_value(3.62) == 3.62
+    assert stats_extra.cop_value("2.5") == 2.5
+    assert stats_extra.cop_value(0.1) is None
+    assert stats_extra.cop_value(99) is None
+    assert stats_extra.cop_value(None) is None
+
+
+def test_payload_omits_what_is_not_known(stats_extra):
+    payload = stats_extra.build_extra(
+        "EcoZenith i255",
+        has_display=False,
+        control_enabled=False,
+        page_count=0,
+        read_failures=0,
+    )
+    assert "hardware" not in payload
+    assert "performance" not in payload
+
+
+def test_payload_carries_hardware_and_performance(stats_extra):
+    payload = stats_extra.build_extra(
+        "EcoZenith i255",
+        has_display=True,
+        control_enabled=False,
+        page_count=1,
+        read_failures=0,
+        heatpump_model="EA720M",
+        serial="720825408489",
+        display_firmware="20260610",
+        heatpump_firmware="20260522",
+        control_firmware=925,
+        cop_year=3.4,
+        cop_lifetime=2.47,
+    )
+    assert payload["hardware"] == {
+        "heatpump": "ea720m",
+        "product": "7208",
+        "made": "2540",
+        "display_fw": "20260610",
+        "heatpump_fw": "20260522",
+        "control_fw": 925,
+    }
+    assert payload["performance"] == {"cop_year": 3.4, "cop_lifetime": 2.47}
+
+
+def test_payload_never_carries_a_full_serial(stats_extra):
+    payload = stats_extra.build_extra(
+        "EcoZenith i255",
+        has_display=True,
+        control_enabled=False,
+        page_count=1,
+        read_failures=0,
+        serial="720825408489",
+    )
+    assert "720825408489" not in repr(payload)
+    assert "8489" not in repr(payload)
+    assert payload["hardware"]["product"] == "7208"
+    assert payload["hardware"]["made"] == "2540"

@@ -76,3 +76,13 @@ def vars118() -> str:
 @pytest.fixture(scope="session")
 def sm_all() -> str:
     return (FIXTURES / "sm_all.txt").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="session")
+def cop():
+    return load("cop")
+
+
+@pytest.fixture(scope="session")
+def identity():
+    return load("identity")
