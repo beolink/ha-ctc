@@ -252,3 +252,59 @@ def test_a_tab_strip_is_tried_before_the_rest(catalogue, web_api):
     )
     assert order[0][1] > 200, "en flik ska provas först"
     assert order[-1][1] < 200, "schemabilden sist"
+
+
+def test_a_rule_at_the_left_edge_does_not_become_the_column(catalogue, web_api):
+    # A divider drawn at x=0 used to be taken for the row name column, after
+    # which no row broke and every reading was named after the first label.
+    widget = web_api.Widget
+    widgets = [
+        widget(index=0, kind=4, x=0, y=228, width=480, height=1, visible=True),
+        widget(index=1, kind=3, x=5, y=55, width=190, height=28, visible=True, label="Total drifttid"),
+        widget(index=2, kind=3, x=195, y=55, width=50, height=28, visible=True, value_fmt="%d", value_vars=[1]),
+        widget(index=3, kind=3, x=5, y=83, width=190, height=28, visible=True, label="Avgiven värme totalt"),
+        widget(index=4, kind=3, x=195, y=83, width=50, height=28, visible=True, value_fmt="%d", value_vars=[2]),
+    ]
+    pairing = catalogue._pair_labels(widgets)
+    assert pairing[2] == "Total drifttid"
+    assert pairing[4] == "Avgiven värme totalt"
+
+
+def test_a_caption_block_is_matched_off_in_order(catalogue, web_api):
+    # Some pages draw every caption first and then every reading. One caption
+    # must not end up naming six unrelated numbers.
+    widget = web_api.Widget
+    widgets = [
+        widget(index=0, kind=3, x=5, y=55, width=190, height=28, visible=True, label="Total drifttid"),
+        widget(index=1, kind=3, x=5, y=-28, width=190, height=28, visible=True, label="Energi el total"),
+        widget(index=2, kind=3, x=5, y=-28, width=190, height=28, visible=True, label="Avgiven värme totalt"),
+        widget(index=3, kind=3, x=195, y=-28, width=50, height=28, visible=True, value_fmt="%d", value_vars=[1]),
+        widget(index=4, kind=3, x=195, y=-28, width=50, height=28, visible=True, value_fmt="%d", value_vars=[2]),
+        widget(index=5, kind=3, x=195, y=-28, width=50, height=28, visible=True, value_fmt="%d", value_vars=[3]),
+        widget(index=6, kind=3, x=195, y=-28, width=50, height=28, visible=True, value_fmt="%d", value_vars=[4]),
+        widget(index=7, kind=3, x=195, y=-28, width=50, height=28, visible=True, value_fmt="%d", value_vars=[5]),
+    ]
+    pairing = catalogue._pair_labels(widgets)
+    named = sorted(set(pairing.values()))
+    assert "Avgiven värme totalt" in named
+    assert not any(name.startswith("Avgiven värme totalt ") for name in pairing.values())
+
+
+def test_the_page_heading_is_not_part_of_the_caption_block(catalogue, web_api):
+    # Counting the heading in shifted every name one step down the list.
+    widget = web_api.Widget
+    widgets = [
+        widget(index=0, kind=3, x=60, y=4, width=290, height=38, visible=True, label="Historisk driftinfo"),
+        widget(index=1, kind=3, x=5, y=-28, width=190, height=28, visible=True, label="Total drifttid"),
+        widget(index=2, kind=3, x=5, y=-28, width=190, height=28, visible=True, label="Energi el total"),
+        widget(index=3, kind=3, x=5, y=-28, width=190, height=28, visible=True, label="Avgiven värme totalt"),
+    ] + [
+        widget(index=4 + n, kind=3, x=195, y=-28, width=50, height=28, visible=True,
+               value_fmt="%d", value_vars=[n + 1])
+        for n in range(5)
+    ]
+    pairing = catalogue._pair_labels(widgets)
+    assert pairing[4] == "Total drifttid"
+    assert pairing[5] == "Energi el total"
+    assert pairing[6] == "Avgiven värme totalt"
+    assert "Historisk driftinfo" not in pairing.values()

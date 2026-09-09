@@ -26,6 +26,9 @@ _CONVERSION = re.compile(r"%[.\-0-9lu]*[dfsu]")
 
 _ROW_TOLERANCE = 14
 _FLOW_X = -10000
+MAX_READINGS_PER_ROW = 4
+#: Anything this high up and this wide is the page heading, not a row name.
+_HEADER_HEIGHT = 45
 
 
 def _decimals(fmt: str) -> float:
@@ -132,7 +135,20 @@ def _row_of(widgets: list[Widget]) -> dict[int, int]:
     positioned = [w for w in widgets if w.x > _FLOW_X]
     if not positioned:
         return {w.index: 0 for w in widgets}
-    label_column = min(w.x for w in positioned)
+
+    # The column is where the row names are, which is not the same as the
+    # leftmost thing on the screen: a divider or a rule drawn at x=0 would
+    # otherwise become the column, and then no row would ever break. The most
+    # common left edge among the captions is what the layout is actually built
+    # on, so that is used, falling back to the leftmost element.
+    columns: dict[int, int] = {}
+    for widget in positioned:
+        if _is_caption(widget) and _usable_label(widget):
+            columns[widget.x] = columns.get(widget.x, 0) + 1
+    if columns:
+        label_column = min(columns, key=lambda x: (-columns[x], x))
+    else:
+        label_column = min(w.x for w in positioned)
 
     rows: dict[int, int] = {}
     row = -1
@@ -147,43 +163,70 @@ def _row_of(widgets: list[Widget]) -> dict[int, int]:
 
 
 def _pair_labels(widgets: list[Widget]) -> dict[int, str]:
-    """Name each reading after the label that starts its row.
+    """Name each reading after the caption that belongs to it.
 
-    Operation data pages are two columns: the name sits at the left edge and the
-    reading, sometimes several of them, to its right. Rows scrolled out of view
-    keep their values, so they are kept as well.
+    Two layouts have to work. Most pages draw a row at a time, caption on the
+    left and reading to its right, which geometry solves. Some pages draw every
+    caption first and then every reading, and rows scrolled out of view all
+    share one off screen y, so geometry has nothing to go on there. What is left
+    then is the order they are drawn in, where the two blocks run in step.
     """
+    captions = [
+        w for w in widgets if w.visible and _is_caption(w) and _usable_label(w) and w.width > 0
+    ]
+    values = [
+        w
+        for w in widgets
+        if w.visible and w.value_fmt and has_conversion(w.value_fmt)
+    ]
+    if not values:
+        return {}
+
     rows = _row_of(widgets)
-    labels_by_row: dict[int, list[Widget]] = {}
-    for widget in widgets:
-        if (
-            widget.visible
-            and _is_caption(widget)
-            and _usable_label(widget)
-            and widget.width > 0
-        ):
-            labels_by_row.setdefault(rows[widget.index], []).append(widget)
-
-    values_by_row: dict[int, list[Widget]] = {}
-    for widget in sorted(widgets, key=lambda w: w.index):
-        if widget.visible and widget.value_fmt and has_conversion(widget.value_fmt):
-            values_by_row.setdefault(rows[widget.index], []).append(widget)
-
     pairing: dict[int, str] = {}
-    for row, values in values_by_row.items():
-        candidates = labels_by_row.get(row)
+    used: set[int] = set()
+
+    # Geometry first: a caption on the same row, to the left of the reading.
+    by_row: dict[int, list[Widget]] = {}
+    for caption in captions:
+        by_row.setdefault(rows[caption.index], []).append(caption)
+    values_by_row: dict[int, list[Widget]] = {}
+    for value in sorted(values, key=lambda w: w.index):
+        values_by_row.setdefault(rows[value.index], []).append(value)
+
+    for row, members in values_by_row.items():
+        candidates = by_row.get(row)
         if not candidates:
-            # Schematic pages draw readings onto a diagram with no caption beside
-            # them. Guessing a nearby string produces confidently wrong names, so
-            # those readings are left to be numbered instead.
+            continue
+        # A genuine row holds a handful of readings at most: the widest seen is
+        # "Överhettning S/H" with four. More than that means this is not a row
+        # but a block of readings that ran past its caption, and guessing would
+        # give several unrelated numbers the same name.
+        if len(members) > MAX_READINGS_PER_ROW:
             continue
         name = (min(candidates, key=lambda w: w.x).label or "").strip()
         if not name:
             continue
-        for position, widget in enumerate(values, start=1):
-            pairing[widget.index] = (
-                name if len(values) == 1 else f"{name} {position}"
+        used.add(min(candidates, key=lambda w: w.x).index)
+        for position, value in enumerate(members, start=1):
+            pairing[value.index] = (
+                name if len(members) == 1 else f"{name} {position}"
             ).strip()
+
+    # Whatever is left is a caption block followed by a reading block. The two
+    # run in the same order, so they are matched off against each other. The
+    # page heading sits across the top and is not part of the block; counting it
+    # in would shift every name by one.
+    spare = [
+        c
+        for c in sorted(captions, key=lambda w: w.index)
+        if c.index not in used and not (0 <= c.y < _HEADER_HEIGHT and c.width >= 80)
+    ]
+    orphans = [v for v in sorted(values, key=lambda w: w.index) if v.index not in pairing]
+    for value, caption in zip(orphans, spare):
+        name = (caption.label or "").strip()
+        if name:
+            pairing[value.index] = name
     return pairing
 
 
