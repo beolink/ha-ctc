@@ -324,3 +324,41 @@ def find_operating_hours(pages: list[Any]) -> Any | None:
             if label.startswith("total drifttid") or label.startswith("total operation time"):
                 matches.append(value)
     return matches or None
+
+
+
+def current_totals(runtime: Any) -> tuple[float | None, float | None]:
+    """The two lifetime counters as the display last reported them."""
+    if getattr(runtime, "web", None) is None:
+        return None, None
+    data = runtime.web.data or {}
+    out = data.get(runtime.energy_out.key) if runtime.energy_out else None
+    consumed = data.get(runtime.energy_in.key) if runtime.energy_in else None
+    return out, consumed
+
+
+#: The coefficient of performance figures the report carries, by the name the
+#: report builder takes them under. Returned as a mapping rather than a tuple:
+#: adding a figure to a tuple silently breaks every caller that unpacks it, and
+#: that once emptied a whole day's reports without a single error in sight.
+COP_REPORT_KEYS = ("cop_day", "cop_year", "cop_first_year", "cop_lifetime")
+
+
+def cop_for_report(runtime: Any) -> dict[str, float | None]:
+    """Each figure only when it stands on its own span.
+
+    Sending the lifetime figure under a yearly name would be a different number
+    wearing the wrong label, so a figure without its span is left out.
+    """
+    figures: dict[str, float | None] = dict.fromkeys(COP_REPORT_KEYS)
+    tracker = getattr(runtime, "cop", None)
+    if tracker is None:
+        return figures
+    out, consumed = current_totals(runtime)
+    yearly = tracker.result(out, consumed)
+    figures["cop_year"] = yearly.value if yearly.basis == "year" else None
+    figures["cop_day"] = tracker.result_day(out, consumed).value
+    figures["cop_first_year"] = tracker.result_first_year().value
+    if out is not None and consumed is not None and consumed >= MIN_CONSUMPTION_KWH:
+        figures["cop_lifetime"] = round(out / consumed, 2)
+    return figures

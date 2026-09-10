@@ -22,7 +22,13 @@ from homeassistant.loader import async_get_integration
 from homeassistant.helpers.storage import Store
 
 from .catalogue import pages_from_storage
-from .cop import CopTracker, find_energy_totals, find_operating_hours
+from .cop import (
+    CopTracker,
+    cop_for_report,
+    current_totals,
+    find_energy_totals,
+    find_operating_hours,
+)
 from .const import (
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
@@ -58,14 +64,6 @@ _LOGGER = logging.getLogger(__name__)
 COP_SAMPLE_INTERVAL = timedelta(hours=6)
 
 
-def current_totals(runtime: "CtcRuntime") -> tuple[float | None, float | None]:
-    """The two lifetime counters as the display last reported them."""
-    if runtime.web is None:
-        return None, None
-    data = runtime.web.data or {}
-    out = data.get(runtime.energy_out.key) if runtime.energy_out else None
-    consumed = data.get(runtime.energy_in.key) if runtime.energy_in else None
-    return out, consumed
 
 
 _FAILURES: dict[str, ErrorCounter] = {}
@@ -94,7 +92,6 @@ def _stats_extra_for(hass: HomeAssistant, entry: CtcConfigEntry) -> dict[str, An
             page_count=0,
             read_failures=1,
         )
-    cop_day, cop_year, cop_lifetime = cop_for_report(runtime)
     return build_extra(
         entry.data.get("model"),
         has_display=runtime.web is not None,
@@ -106,9 +103,7 @@ def _stats_extra_for(hass: HomeAssistant, entry: CtcConfigEntry) -> dict[str, An
         display_firmware=runtime.identity.display_firmware,
         heatpump_firmware=runtime.identity.heatpump_firmware,
         control_firmware=(runtime.modbus.data or {}).get("control_sw"),
-        cop_day=cop_day,
-        cop_year=cop_year,
-        cop_lifetime=cop_lifetime,
+        **cop_for_report(runtime),
     )
 
 
@@ -151,26 +146,6 @@ def commissioning_date(runtime: "CtcRuntime"):
     return date.today() - timedelta(hours=hours)
 
 
-def cop_for_report(
-    runtime: "CtcRuntime",
-) -> tuple[float | None, float | None, float | None, float | None]:
-    """Return the figures over a day, a rolling year and the whole lifetime.
-
-    Each is only returned when it actually stands on its own span. Sending the
-    lifetime figure under a yearly name would be a different number wearing the
-    wrong label.
-    """
-    if runtime.cop is None:
-        return None, None, None, None
-    out, consumed = current_totals(runtime)
-    result = runtime.cop.result(out, consumed)
-    yearly = result.value if result.basis == "year" else None
-    daily = runtime.cop.result_day(out, consumed).value
-    first_year = runtime.cop.result_first_year().value
-    lifetime = None
-    if out is not None and consumed is not None and consumed >= 50:
-        lifetime = round(out / consumed, 2)
-    return daily, yearly, first_year, lifetime
 
 
 @dataclass

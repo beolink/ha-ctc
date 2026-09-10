@@ -23,7 +23,8 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from homeassistant.const import EntityCategory
 
-from . import CtcConfigEntry, current_totals
+from . import CtcConfigEntry
+from .cop import current_totals
 from .const import DOMAIN, ModbusSensor, SlowValue
 
 DEVICE_CLASSES = {
