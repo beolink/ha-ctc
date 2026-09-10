@@ -231,3 +231,48 @@ def test_the_first_year_reaches_the_report(stats_extra):
         page_count=2, read_failures=0, cop_first_year=2.51,
     )
     assert payload["metrics"]["cop_first_year"] == 2.51
+
+
+# ------------------------------------------------- what stats.py lets through
+
+
+def _stats_py_extra_keys():
+    """EXTRA_KEYS as written in stats.py, read without importing it.
+
+    stats.py pulls in Home Assistant, which these tests run without, so the
+    tuple is taken straight from the source.
+    """
+    import ast
+    import pathlib
+
+    source = pathlib.Path(__file__).resolve().parent.parent / (
+        "custom_components/ctc_ecozenith/stats.py"
+    )
+    for node in ast.parse(source.read_text(encoding="utf-8")).body:
+        if isinstance(node, ast.Assign) and any(
+            getattr(target, "id", None) == "EXTRA_KEYS" for target in node.targets
+        ):
+            return set(ast.literal_eval(node.value))
+    raise AssertionError("EXTRA_KEYS not found in stats.py")
+
+
+def test_every_key_the_report_builds_gets_through_stats_py(stats_extra):
+    """stats.py drops any key not in EXTRA_KEYS, silently. "firmwares" was
+    missing from it, so the per-board firmware never reached the backend."""
+    payload = stats_extra.build_extra(
+        "EcoZenith i255",
+        has_display=True,
+        control_enabled=True,
+        page_count=3,
+        read_failures=1,
+        heatpump_model="EA720M",
+        serial="720825408489",
+        display_firmware="20260610",
+        heatpump_firmware="20260522",
+        control_firmware=925,
+        cop_day=3.9,
+        cop_year=3.4,
+        cop_lifetime=2.47,
+    )
+    assert "firmwares" in payload
+    assert set(payload) <= _stats_py_extra_keys()

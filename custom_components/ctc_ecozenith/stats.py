@@ -58,7 +58,11 @@ TIMEOUT = 10
 #: Only these keys may be added by the integration's own extra callback. The
 #: backend rejects anything else, but stopping it here keeps a careless caller
 #: from ever putting house data on the wire in the first place.
-EXTRA_KEYS = ("models", "features", "errors", "metrics", "firmware")
+#: "firmwares" is the per-board object ({"display": ..., "heatpump": ...,
+#: "control": ...}) that schema 2 added and the backend has accepted since; it
+#: was missing here, so every integration sending it had its firmware dropped
+#: before the wire.
+EXTRA_KEYS = ("models", "features", "errors", "metrics", "firmware", "firmwares")
 
 #: Decimals kept of the position. One decimal is roughly 11 km, which is enough
 #: for climate, price area and a readable map, and far too coarse to point at a
