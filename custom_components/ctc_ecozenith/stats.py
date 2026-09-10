@@ -7,6 +7,14 @@ itself, entity counts, a few on/off flags and an approximate position rounded
 to about 11 km. Never a name, an address, an exact position, a serial number,
 an entity id or anything at a finer resolution than one day.
 
+Two things tie the picture together. ``ha_id`` is a hash of Home Assistant's
+own instance id, so every beolink plugin on the same installation arrives at
+the same value on its own, without talking to each other; the instance id
+itself never leaves the house, and the server hashes the hash again before
+storing it. And the report carries how many warnings and errors the
+integration's own logger has written since the previous report: the counts
+only, never a message.
+
 Reporting is on by default and is switched off in the integration's options.
 Switching it off sends one last call that erases everything stored about this
 particular installation.
@@ -25,6 +33,7 @@ What is collected, and why: https://stats.rnet.se/integritet
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
 import random
 import uuid
@@ -34,7 +43,7 @@ from typing import Any, Callable
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers import device_registry as dr, entity_registry as er
+from homeassistant.helpers import device_registry as dr, entity_registry as er, instance_id
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.event import async_call_later, async_track_time_interval
 from homeassistant.helpers.storage import Store
@@ -101,6 +110,48 @@ def stats_enabled(entry: ConfigEntry) -> bool:
     return bool(data.get(OPTION_KEY, True))
 
 
+class _LogCounter(logging.Handler):
+    """Counts warnings and errors in the integration's own log.
+
+    Attached to the ``custom_components.<domain>`` logger, which every module
+    of the integration logs through. Only the counts are ever read.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(level=logging.WARNING)
+        self.errors = 0
+        self.warnings = 0
+
+    def emit(self, record: logging.LogRecord) -> None:
+        if record.levelno >= logging.ERROR:
+            self.errors += 1
+        else:
+            self.warnings += 1
+
+
+#: One counter per integration, owned by the first config entry that armed it,
+#: so that two entries of the same integration never report the same lines.
+_COUNTERS: dict[str, tuple[_LogCounter, str]] = {}
+
+
+def _log_counter_for(domain: str, entry_id: str) -> _LogCounter | None:
+    """The counter this entry reports from, or None if another entry owns it."""
+    owned = _COUNTERS.get(domain)
+    if owned is None:
+        counter = _LogCounter()
+        logging.getLogger(f"custom_components.{domain}").addHandler(counter)
+        _COUNTERS[domain] = (counter, entry_id)
+        return counter
+    return owned[0] if owned[1] == entry_id else None
+
+
+def _release_log_counter(domain: str, entry_id: str) -> None:
+    owned = _COUNTERS.get(domain)
+    if owned is not None and owned[1] == entry_id:
+        logging.getLogger(f"custom_components.{domain}").removeHandler(owned[0])
+        _COUNTERS.pop(domain, None)
+
+
 class StatsReporter:
     """Sends one anonymous report per day.
 
@@ -151,6 +202,9 @@ class StatsReporter:
             _LOGGER.debug("Statistics disabled for %s", self.domain)
             return
 
+        # Count the integration's warnings and errors from now on.
+        _log_counter_for(self.domain, self.entry.entry_id)
+
         async def _first(_now) -> None:
             await self.async_report()
             self._cancel.append(
@@ -166,6 +220,16 @@ class StatsReporter:
         for cancel in self._cancel:
             cancel()
         self._cancel.clear()
+        _release_log_counter(self.domain, self.entry.entry_id)
+
+    async def _async_ha_id(self) -> str | None:
+        """The id every beolink plugin on this Home Assistant arrives at on its
+        own. A hash of HA's instance id, so the instance id stays in the house."""
+        try:
+            iid = await instance_id.async_get(self.hass)
+        except Exception:  # pragma: no cover - depends on the HA version
+            return None
+        return hashlib.sha256(f"beolink-stats:{iid}".encode()).hexdigest()[:32]
 
     @property
     def armed(self) -> bool:
@@ -218,7 +282,12 @@ class StatsReporter:
             "devices": devices,
             "lat": lat,
             "lon": lon,
+            "ha_id": await self._async_ha_id(),
         }
+        counter = _log_counter_for(self.domain, self.entry.entry_id)
+        if counter is not None:
+            payload["log_errors"] = counter.errors
+            payload["log_warnings"] = counter.warnings
         if self.extra:
             try:
                 for key, value in (self.extra() or {}).items():
@@ -249,6 +318,14 @@ class StatsReporter:
                 async with session.post(self.endpoint, json=payload) as resp:
                     if resp.status >= 400:
                         _LOGGER.debug("Statistics rejected: %s", resp.status)
+                    else:
+                        # The counts went out. Subtract what was sent rather
+                        # than zeroing, so lines logged during the send are
+                        # kept for the next report.
+                        counter = _log_counter_for(self.domain, self.entry.entry_id)
+                        if counter is not None:
+                            counter.errors = max(0, counter.errors - payload.get("log_errors", 0))
+                            counter.warnings = max(0, counter.warnings - payload.get("log_warnings", 0))
         except Exception:  # noqa: BLE001 - statistics must never break anything
             _LOGGER.debug("Could not send statistics", exc_info=True)
 
