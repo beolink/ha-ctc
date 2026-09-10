@@ -149,6 +149,7 @@ def build_extra(
     control_firmware: Any = None,
     cop_day: Any = None,
     cop_year: Any = None,
+    cop_first_year: Any = None,
     cop_lifetime: Any = None,
 ) -> dict[str, Any]:
     """Build the integration specific part of the daily report.
@@ -195,6 +196,7 @@ def build_extra(
     metrics = {
         "cop_day": cop_value(cop_day),
         "cop_year": cop_value(cop_year),
+        "cop_first_year": cop_value(cop_first_year),
         "cop_lifetime": cop_value(cop_lifetime),
         "built_year": 2000 + int(made[:2]) if made else None,
         "built_week": int(made[2:]) if made else None,

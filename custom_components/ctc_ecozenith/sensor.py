@@ -91,7 +91,7 @@ async def async_setup_entry(
             entities.append(CtcIdentitySensor(runtime, key, name, value, icon))
 
     if runtime.cop is not None:
-        for span in ("day", "year", "lifetime"):
+        for span in ("day", "year", "first_year", "lifetime"):
             entities.append(CtcCopSensor(runtime, span))
 
     async_add_entities(entities)
@@ -218,6 +218,7 @@ class CtcCopSensor(CoordinatorEntity, SensorEntity):
     NAMES = {
         "day": "Dygnsvärmefaktor",
         "year": "Årsvärmefaktor",
+        "first_year": "Värmefaktor, första året",
         "lifetime": "Värmefaktor, hela livslängden",
     }
 
@@ -234,6 +235,8 @@ class CtcCopSensor(CoordinatorEntity, SensorEntity):
         out, consumed = current_totals(self._runtime)
         if self._span == "day":
             return self._runtime.cop.result_day(out, consumed)
+        if self._span == "first_year":
+            return self._runtime.cop.result_first_year()
         return self._runtime.cop.result(out, consumed)
 
     @property

@@ -94,7 +94,7 @@ def test_one_sample_a_day_replaces_the_earlier_one(cop):
 def test_samples_survive_a_restart(cop):
     store = FakeStore()
     today = date(2026, 9, 9)
-    run(cop.CopTracker(store).async_record(18000, 7500, today=today - timedelta(days=400)))
+    run(cop.CopTracker(store).async_record(18000, 7500, today=today - timedelta(days=366)))
 
     revived = cop.CopTracker(store)
     run(revived.async_load())
@@ -224,3 +224,97 @@ def test_an_old_store_without_the_daily_run_still_loads(cop):
     run(tracker.async_load())
     assert tracker.result_day(22440, 9112).value is None
     assert tracker.result(22440, 9112).basis == "lifetime"
+
+
+
+# ------------------------------------------------------ ankaret och första året
+
+
+def test_fourteen_months_is_not_a_year(cop):
+    # A gap in the samples must not quietly stretch "the last year".
+    tracker = cop.CopTracker(FakeStore())
+    today = date(2026, 9, 9)
+    run(tracker.async_record(18000, 7500, today=today - timedelta(days=430)))
+    assert tracker.result(22421, 9088, today=today).basis == "lifetime"
+
+
+def test_the_commissioning_day_counts_as_a_zero_sample(cop):
+    # CTC's counters start from nothing the day the unit is commissioned, so a
+    # year after that the whole lifetime is exactly one year.
+    tracker = cop.CopTracker(FakeStore())
+    commissioned = date(2025, 10, 10)
+    run(tracker.async_set_anchor(commissioned))
+    anniversary = commissioned + timedelta(days=366)
+    result = tracker.result(24000, 9700, today=anniversary)
+    assert result.basis == "year"
+    assert result.value == pytest.approx(24000 / 9700, abs=0.01)
+
+
+def test_the_anchor_is_only_moved_earlier(cop):
+    # Operating hours stop while the unit is off, so the earliest start seen is
+    # the closest to the truth and a later reading must not replace it.
+    store = FakeStore()
+    tracker = cop.CopTracker(store)
+    run(tracker.async_set_anchor(date(2025, 10, 10)))
+    run(tracker.async_set_anchor(date(2025, 10, 20)))
+    assert tracker.anchor == date(2025, 10, 10)
+    run(tracker.async_set_anchor(date(2025, 10, 1)))
+    assert tracker.anchor == date(2025, 10, 1)
+
+
+def test_the_first_year_is_captured_and_kept(cop):
+    store = FakeStore()
+    tracker = cop.CopTracker(store)
+    commissioned = date(2025, 10, 10)
+    run(tracker.async_set_anchor(commissioned))
+    assert tracker.result_first_year().value is None
+
+    anniversary = commissioned + timedelta(days=366)
+    run(tracker.async_record(24000, 9700, today=anniversary))
+    first = tracker.result_first_year()
+    assert first.basis == "first_year"
+    assert first.value == pytest.approx(24000 / 9700, abs=0.01)
+
+    # A later year does not overwrite the first one.
+    run(tracker.async_record(46000, 18900, today=anniversary + timedelta(days=365)))
+    assert tracker.result_first_year().value == pytest.approx(24000 / 9700, abs=0.01)
+
+
+def test_the_first_year_survives_a_restart(cop):
+    store = FakeStore()
+    commissioned = date(2025, 10, 10)
+    tracker = cop.CopTracker(store)
+    run(tracker.async_set_anchor(commissioned))
+    run(tracker.async_record(24000, 9700, today=commissioned + timedelta(days=366)))
+
+    revived = cop.CopTracker(store)
+    run(revived.async_load())
+    assert revived.anchor == commissioned
+    assert revived.result_first_year().value == pytest.approx(24000 / 9700, abs=0.01)
+
+
+def test_no_first_year_before_the_anniversary(cop):
+    tracker = cop.CopTracker(FakeStore())
+    commissioned = date(2025, 10, 10)
+    run(tracker.async_set_anchor(commissioned))
+    run(tracker.async_record(22499, 9116, today=date(2026, 9, 10)))
+    assert tracker.result_first_year().value is None
+    assert tracker.result(22499, 9116, today=date(2026, 9, 10)).basis == "lifetime"
+
+
+def test_powered_on_hours_are_told_apart_from_compressor_hours(cop, const):
+    # "Total drifttid" and "Drifttid total" look alike, and in English both are
+    # "Total operation time". Both are candidates; the caller takes the larger.
+    def value(label, key):
+        return const.SlowValue(key=key, label=label, page=30, screen=128,
+                               fmt="%d", var_indices=[1], unit="h")
+    page = const.SlowPage(page=30, title="Historik", screens=[128])
+    page.values = [value("Total drifttid", "a"), value("Drifttid total", "b"),
+                   value("Timer avfrostning", "c")]
+    found = cop.find_operating_hours([page])
+    assert [v.key for v in found] == ["a"]
+
+
+def test_no_operating_hours_without_the_history_page(cop, const):
+    page = const.SlowPage(page=22, title="Värmepump", screens=[118])
+    assert cop.find_operating_hours([page]) is None

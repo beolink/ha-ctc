@@ -40,6 +40,10 @@ DAY_MAX_HOURS = 30
 #: How long the short run of samples behind the daily figure is kept.
 RECENT_DAYS = 4
 
+#: A yearly figure has to stand on a span close to a year. A gap in the samples
+#: must not quietly turn "the last year" into "the last fourteen months".
+YEAR_MAX_DAYS = 380
+
 
 @dataclass
 class CopResult:
@@ -56,6 +60,7 @@ class CopResult:
         basis = {
             "year": "rullande år",
             "day": "senaste dygnet",
+            "first_year": "första året",
             "lifetime": "hela livslängden",
         }.get(self.basis, self.basis)
         return {
@@ -88,6 +93,12 @@ class CopTracker:
         #: spacing than one a day, or "yesterday" could be anything from 12 to
         #: 36 hours ago depending on when the samples happened to land.
         self._recent: list[tuple[str, float, float]] = []
+        #: The day the lifetime counters started from zero, when known. CTC's
+        #: counters begin at nothing the day the unit is commissioned, which
+        #: makes that day a sample of its own: zero delivered, zero consumed.
+        self._anchor: str | None = None
+        #: The first year of the machine's life, kept once it has been seen.
+        self._first_year: list[float] | None = None
         self._loaded = False
 
     async def async_load(self) -> None:
@@ -100,6 +111,12 @@ class CopTracker:
                 for day, values in data["samples"].items()
                 if isinstance(values, (list, tuple)) and len(values) >= 2
             }
+        if isinstance(data, dict):
+            anchor = data.get("anchor")
+            self._anchor = anchor if isinstance(anchor, str) else None
+            first = data.get("first_year")
+            if isinstance(first, (list, tuple)) and len(first) >= 3:
+                self._first_year = [float(first[0]), float(first[1]), float(first[2])]
         if isinstance(data, dict) and isinstance(data.get("recent"), list):
             for row in data["recent"]:
                 if isinstance(row, (list, tuple)) and len(row) >= 3:
@@ -130,7 +147,59 @@ class CopTracker:
         keep = when - timedelta(days=RECENT_DAYS)
         self._recent = [r for r in self._recent if _parse(r[0]) >= keep]
 
-        await self._store.async_save({"samples": self._samples, "recent": self._recent})
+        self._capture_first_year(when.date())
+        await self._async_save()
+
+    async def _async_save(self) -> None:
+        await self._store.async_save(
+            {
+                "samples": self._samples,
+                "recent": self._recent,
+                "anchor": self._anchor,
+                "first_year": self._first_year,
+            }
+        )
+
+    async def async_set_anchor(self, commissioned: date) -> None:
+        """Record the day the counters started from zero.
+
+        Only ever moved earlier, never later: the operating hours it is worked
+        out from stop counting while the unit is switched off, so the earliest
+        answer seen is the closest to the truth.
+        """
+        await self.async_load()
+        stamp = commissioned.isoformat()
+        if self._anchor is None or stamp < self._anchor:
+            self._anchor = stamp
+            await self._async_save()
+
+    @property
+    def anchor(self) -> date | None:
+        return date.fromisoformat(self._anchor) if self._anchor else None
+
+    def _capture_first_year(self, today: date) -> None:
+        """Keep the first year's figure once a sample from its end exists.
+
+        The counters were zero on the anchor day, so a sample taken about a year
+        later holds the whole first year on its own. It is kept for good: the
+        machine only ever has one first year.
+        """
+        if self._first_year is not None or self._anchor is None:
+            return
+        start = date.fromisoformat(self._anchor)
+        for day in sorted(self._samples):
+            span = (date.fromisoformat(day) - start).days
+            if COP_WINDOW_DAYS <= span <= YEAR_MAX_DAYS:
+                out, consumed = self._samples[day]
+                self._first_year = [float(out), float(consumed), float(span)]
+                return
+
+    def result_first_year(self) -> CopResult:
+        """The machine's first year, or nothing until it has had one."""
+        if self._first_year is None:
+            return CopResult(None, "first_year", 0)
+        out, consumed, span = self._first_year
+        return CopResult(_ratio(out, consumed), "first_year", int(span), round(out, 1), round(consumed, 1))
 
     def result_day(
         self,
@@ -178,9 +247,13 @@ class CopTracker:
 
         now = today or date.today()
         window_start = (now - timedelta(days=COP_WINDOW_DAYS)).isoformat()
-        older = sorted(d for d in self._samples if d <= window_start)
+        earliest = (now - timedelta(days=YEAR_MAX_DAYS)).isoformat()
+        candidates = dict(self._samples)
+        if self._anchor is not None:
+            candidates.setdefault(self._anchor, [0.0, 0.0])
+        older = sorted(d for d in candidates if earliest <= d <= window_start)
         if older:
-            base_out, base_in = self._samples[older[-1]]
+            base_out, base_in = candidates[older[-1]]
             span = (now - date.fromisoformat(older[-1])).days
             delta_out = energy_out - base_out
             delta_in = energy_in - base_in
@@ -230,3 +303,24 @@ def find_energy_totals(pages: list[Any]) -> tuple[Any | None, Any | None]:
             elif consumed is None and match(value, LABEL_ENERGY_IN_EN, LABEL_ENERGY_IN_SV):
                 consumed = value
     return out, consumed
+
+
+
+def find_operating_hours(pages: list[Any]) -> Any | None:
+    """Pick the unit's total powered-on hours out of the harvested pages.
+
+    Two rows look alike, "Total drifttid" for the hours the unit has been
+    powered and "Drifttid total" for the compressor alone, and in English they
+    are both "Total operation time". Powered-on hours can never be fewer than
+    compressor hours, so of the rows that match, the largest one is the right
+    one; the choice is made at read time, from the values themselves.
+    """
+    matches = []
+    for page in pages:
+        for value in page.values:
+            label = (value.label or "").strip().casefold()
+            if (value.unit or "") != "h":
+                continue
+            if label.startswith("total drifttid") or label.startswith("total operation time"):
+                matches.append(value)
+    return matches or None

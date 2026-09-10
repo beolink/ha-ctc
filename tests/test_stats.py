@@ -223,3 +223,11 @@ def test_the_daily_figure_reaches_the_report(stats_extra):
     )
     assert payload["metrics"]["cop_day"] == 3.9
     assert payload["metrics"]["cop_year"] == 3.4
+
+
+def test_the_first_year_reaches_the_report(stats_extra):
+    payload = stats_extra.build_extra(
+        "EcoZenith i255", has_display=True, control_enabled=False,
+        page_count=2, read_failures=0, cop_first_year=2.51,
+    )
+    assert payload["metrics"]["cop_first_year"] == 2.51

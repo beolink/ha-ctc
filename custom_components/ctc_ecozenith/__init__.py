@@ -22,7 +22,7 @@ from homeassistant.loader import async_get_integration
 from homeassistant.helpers.storage import Store
 
 from .catalogue import pages_from_storage
-from .cop import CopTracker, find_energy_totals
+from .cop import CopTracker, find_energy_totals, find_operating_hours
 from .const import (
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
@@ -131,9 +131,29 @@ async def _async_arm_statistics(hass: HomeAssistant, entry: CtcConfigEntry) -> N
         _LOGGER.debug("Could not arm the statistics reporter", exc_info=True)
 
 
+def commissioning_date(runtime: "CtcRuntime"):
+    """Work out when the lifetime counters started, from the powered-on hours.
+
+    CTC counts the hours the unit has been switched on. Taken back from today
+    they land on the day it was commissioned, which is also the day both energy
+    counters stood at zero. The hours stop while the unit is off, so the answer
+    can only come out late, never early, and the tracker keeps the earliest one.
+    """
+    from datetime import date, timedelta
+
+    if runtime.web is None or not runtime.operating_hours:
+        return None
+    data = runtime.web.data or {}
+    readings = [data.get(v.key) for v in runtime.operating_hours]
+    hours = max((h for h in readings if isinstance(h, (int, float)) and h > 0), default=None)
+    if hours is None:
+        return None
+    return date.today() - timedelta(hours=hours)
+
+
 def cop_for_report(
     runtime: "CtcRuntime",
-) -> tuple[float | None, float | None, float | None]:
+) -> tuple[float | None, float | None, float | None, float | None]:
     """Return the figures over a day, a rolling year and the whole lifetime.
 
     Each is only returned when it actually stands on its own span. Sending the
@@ -141,15 +161,16 @@ def cop_for_report(
     wrong label.
     """
     if runtime.cop is None:
-        return None, None, None
+        return None, None, None, None
     out, consumed = current_totals(runtime)
     result = runtime.cop.result(out, consumed)
     yearly = result.value if result.basis == "year" else None
     daily = runtime.cop.result_day(out, consumed).value
+    first_year = runtime.cop.result_first_year().value
     lifetime = None
     if out is not None and consumed is not None and consumed >= 50:
         lifetime = round(out / consumed, 2)
-    return daily, yearly, lifetime
+    return daily, yearly, first_year, lifetime
 
 
 @dataclass
@@ -167,6 +188,8 @@ class CtcRuntime:
     #: The two lifetime counters, once they turn up among the harvested pages.
     energy_out: Any | None = None
     energy_in: Any | None = None
+    #: Candidate rows for the unit's powered-on hours; the largest is used.
+    operating_hours: Any | None = None
 
 
 type CtcConfigEntry = ConfigEntry[CtcRuntime]
@@ -254,6 +277,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         runtime.web = web
         runtime.pages = pages
         runtime.energy_out, runtime.energy_in = find_energy_totals(pages)
+        runtime.operating_hours = find_operating_hours(pages)
         if runtime.energy_out is not None and runtime.energy_in is not None:
             runtime.cop = CopTracker(
                 Store(hass, 1, f"{DOMAIN}_{entry.entry_id}_cop")
@@ -274,6 +298,9 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         async def _record_cop(_now=None) -> None:
             out, consumed = current_totals(runtime)
             try:
+                commissioned = commissioning_date(runtime)
+                if commissioned is not None:
+                    await runtime.cop.async_set_anchor(commissioned)  # type: ignore[union-attr]
                 await runtime.cop.async_record(out, consumed)  # type: ignore[union-attr]
             except Exception as err:  # noqa: BLE001 - a missed sample is not fatal
                 _LOGGER.debug("Could not write down the energy counters: %s", err)
