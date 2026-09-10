@@ -181,6 +181,9 @@ class StatsReporter:
         self._store: Store = Store(hass, 1, f"{domain}.stats")
         self._install_id: str | None = None
         self._cancel: list[Callable[[], None]] = []
+        # Set by async_stop, so a first report that was already on the wire
+        # when the entry unloaded does not arm the daily timer afterwards.
+        self._stopped = False
         self._logged_once = False
 
     async def _async_install_id(self) -> str:
@@ -204,9 +207,15 @@ class StatsReporter:
 
         # Count the integration's warnings and errors from now on.
         _log_counter_for(self.domain, self.entry.entry_id)
+        self._stopped = False
 
         async def _first(_now) -> None:
             await self.async_report()
+            if self._stopped:
+                # Unloaded while the report was on the wire: the handle that
+                # fired is already cancelled and nobody holds this reporter
+                # any more, so a timer armed now could never be stopped.
+                return
             self._cancel.append(
                 async_track_time_interval(self.hass, self.async_report, INTERVAL)
             )
@@ -217,6 +226,7 @@ class StatsReporter:
 
     async def async_stop(self) -> None:
         """Cancel the timers. Safe to call more than once."""
+        self._stopped = True
         for cancel in self._cancel:
             cancel()
         self._cancel.clear()
