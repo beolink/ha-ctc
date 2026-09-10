@@ -318,3 +318,26 @@ def test_powered_on_hours_are_told_apart_from_compressor_hours(cop, const):
 def test_no_operating_hours_without_the_history_page(cop, const):
     page = const.SlowPage(page=22, title="Värmepump", screens=[118])
     assert cop.find_operating_hours([page]) is None
+
+
+def test_a_later_read_fills_gaps_but_never_wipes(identity):
+    # The display writes these values the first time their screen is shown,
+    # so a read before that finds nothing and must not erase what is known.
+    known = identity.Identity(serial="720825408489", display_firmware="20260610")
+    empty = identity.Identity()
+    assert known.merged_with(empty).display_firmware == "20260610"
+
+    # A value that was actually read wins: firmware gets updated.
+    later = identity.Identity(heatpump_model="EA720M", display_firmware="20270101")
+    merged = known.merged_with(later)
+    assert merged.heatpump_model == "EA720M"
+    assert merged.display_firmware == "20270101", "en uppdaterad firmware ska synas"
+    assert merged.serial == "720825408489", "det som inte lästes om ska ligga kvar"
+
+
+def test_complete_only_when_every_field_is_known(identity):
+    partial = identity.Identity(serial="720825408489")
+    assert not partial.is_complete
+    full = identity.Identity(serial="1", mac="2", display_firmware="3",
+                             bootloader="4", heatpump_model="5", heatpump_firmware="6")
+    assert full.is_complete

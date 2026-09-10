@@ -86,6 +86,23 @@ class Identity:
         return not any(asdict(self).values())
 
     @property
+    def is_complete(self) -> bool:
+        """True once every field the display can offer has been seen."""
+        return all(asdict(self).values())
+
+    def merged_with(self, newer: "Identity") -> "Identity":
+        """Take what the newer read found, and keep the rest.
+
+        A value that was actually read wins, because firmware gets updated and
+        the newer read is the fresher one. An empty value does not: the display
+        only writes these into a screen once that screen has been shown, so a
+        read before that finds nothing, and nothing must not wipe a known value.
+        """
+        mine = asdict(self)
+        theirs = asdict(newer)
+        return Identity(**{k: theirs[k] or mine[k] for k in mine})
+
+    @property
     def manufactured(self) -> str | None:
         """When the unit was built, read out of its serial number.
 

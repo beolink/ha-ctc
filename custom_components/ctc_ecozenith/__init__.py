@@ -205,12 +205,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     # What the unit is, rather than what it is doing. Static, so it is read once
     # and kept: the panel writes it into its own screens and never changes it.
     identity = Identity.from_dict(options.get(CONF_IDENTITY))
-    if identity.is_empty:
+    # The display only writes these values into a screen once that screen has
+    # been shown on the panel. Until then they read as empty, so a unit whose
+    # system information page nobody has opened reports no firmware at all.
+    # Reading again at every start, and only ever filling gaps, means the
+    # values turn up by themselves the first time someone opens the page.
+    if not identity.is_complete:
         try:
-            identity = await async_read_identity(web_client)
+            found = await async_read_identity(web_client)
         except Exception as err:  # noqa: BLE001 - identity is nice to have
             _LOGGER.debug("Could not read the unit's identity: %s", err)
-        if not identity.is_empty:
+            found = Identity()
+        merged = identity.merged_with(found)
+        if merged.as_dict() != identity.as_dict():
+            identity = merged
             hass.config_entries.async_update_entry(
                 entry, options={**options, CONF_IDENTITY: identity.as_dict()}
             )
