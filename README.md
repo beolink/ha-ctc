@@ -131,6 +131,20 @@ sent about your installation. The full list of fields and the reasoning:
 <https://stats.rnet.se/integritet>. The code that builds the report is
 `stats_extra.py`, and the client that sends it is `stats.py`.
 
+## Roadmap
+
+- **stats.py, the reference copy: stop reporting for an entry that is removed
+  or disabled while its set-up is being retried.** Home Assistant cancels the
+  retry without calling `async_unload_entry` (checked against 2026.9.1), so a
+  reporter armed at the top of `async_setup_entry` keeps sending, with its log
+  handler attached, until Home Assistant restarts. Before each report, check
+  that the entry still exists and is not disabled, and stop otherwise; then
+  copy the file to the other integrations.
+- **`test_counters_going_backwards_fall_back_to_lifetime`** puts its sample 400
+  days back, which the year window (`YEAR_MAX_DAYS = 380`) now refuses on its
+  own, so the test passes without reaching the backwards guard it is named
+  after. At 366 days it tests the guard again.
+
 ## Licence
 
 Apache 2.0.
