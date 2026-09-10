@@ -324,8 +324,10 @@ class StatsReporter:
                         # kept for the next report.
                         counter = _log_counter_for(self.domain, self.entry.entry_id)
                         if counter is not None:
-                            counter.errors = max(0, counter.errors - payload.get("log_errors", 0))
-                            counter.warnings = max(0, counter.warnings - payload.get("log_warnings", 0))
+                            sent_errors = payload.get("log_errors", 0)
+                            sent_warnings = payload.get("log_warnings", 0)
+                            counter.errors = max(0, counter.errors - sent_errors)
+                            counter.warnings = max(0, counter.warnings - sent_warnings)
         except Exception:  # noqa: BLE001 - statistics must never break anything
             _LOGGER.debug("Could not send statistics", exc_info=True)
 
