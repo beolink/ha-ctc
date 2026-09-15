@@ -50,6 +50,12 @@ LANG_SWEDISH: Final = 1
 # instead of the id.
 OPERATION_DATA_LABEL_EN: Final = "Operation data"
 
+#: What makes a display row a period rather than a lifetime total: "Avgiven
+#: värme/30 dagar" and "Avgiven energi/24h" sit right beside the totals on the
+#: history page. A lifetime counter only grows; a period rises and falls as days
+#: leave the window.
+PERIOD_MARKERS: Final = ("/", "24", "30")
+
 # CTC uses these raw values to say "no sensor fitted". They must never reach a
 # sensor as a real reading.
 SENTINELS: Final = frozenset({9999, -9999, 10000, -10000, 32767, -32768, 4294967295})

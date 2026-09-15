@@ -15,7 +15,7 @@ import logging
 import re
 from typing import Any
 
-from .const import SENTINELS, SlowPage, SlowValue
+from .const import PERIOD_MARKERS, SENTINELS, SlowPage, SlowValue
 from .web_api import CtcWebClient, CtcWebError, Widget, tap_target
 
 _LOGGER = logging.getLogger(__name__)
@@ -78,6 +78,25 @@ def _clean_label(label: str) -> str:
     base = _base_label(label)
     cleaned = _LABEL_UNIT.sub("", base).strip(" ()") or base
     return f"{cleaned}{suffix.group(0)}" if suffix else cleaned
+
+
+def display_state_class(unit: str | None, label: str | None) -> str | None:
+    """The state class a display reading should carry, going by its unit and row.
+
+    Energy in kWh is either a lifetime counter, which only grows, or a period
+    such as "Avgiven värme/30 dagar", which rises and falls as days leave the
+    window. Home Assistant refuses "measurement" for energy: a counter is
+    "total_increasing", and a period fits no state class at all, so it gets
+    none. Every other reading with a unit is a measurement.
+    """
+    if not unit:
+        return None
+    if unit == "kWh":
+        text = (label or "").casefold()
+        if any(marker in text for marker in PERIOD_MARKERS):
+            return None
+        return "total_increasing"
+    return "measurement"
 
 
 def numeric_value(value: SlowValue, raw: list[Any]) -> float | None:

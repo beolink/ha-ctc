@@ -23,7 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from .const import COP_HISTORY_DAYS, COP_WINDOW_DAYS, SENTINELS
+from .const import COP_HISTORY_DAYS, COP_WINDOW_DAYS, PERIOD_MARKERS, SENTINELS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -279,10 +279,6 @@ class CopTracker:
         )
 
 
-#: What makes a row a period rather than a lifetime total: "Avgiven energi/24h"
-#: and "Avgiven värme/30 dagar" sit right beside the totals.
-_NOT_A_TOTAL = ("/", "24", "30")
-
 #: The older name of the delivered heat counter. The display's text catalogue
 #: holds both generations (read off an i255 on 2026-09-15): text 935 "Energy
 #: output (kWh)", in Swedish "Avgiven energi (kWh)", which is the row CTC's
@@ -325,7 +321,7 @@ def find_energy_totals(pages: list[Any]) -> tuple[Any | None, Any | None]:
         return (
             (getattr(value, "unit", None) or "").casefold() == "kwh"
             and text.startswith(names)
-            and not any(word in text for word in _NOT_A_TOTAL)
+            and not any(marker in text for marker in PERIOD_MARKERS)
         )
 
     values = [value for page in pages for value in page.values]

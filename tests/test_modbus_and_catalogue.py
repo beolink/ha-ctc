@@ -308,3 +308,28 @@ def test_the_page_heading_is_not_part_of_the_caption_block(catalogue, web_api):
     assert pairing[5] == "Energi el total"
     assert pairing[6] == "Avgiven värme totalt"
     assert "Historisk driftinfo" not in pairing.values()
+
+
+# ------------------------------------------- state classes of display readings
+
+
+def test_lifetime_energy_counters_only_grow(catalogue):
+    # The history page on an i550 Pro (page 30, screen 136) and on an i255.
+    for label in ("Avgiven värme totalt", "Tillförd energi totalt", "Avgiven kyla totalt",
+                  "Energi el total", "EMXXX", "Energy output total", "Avgiven energi"):
+        assert catalogue.display_state_class("kWh", label) == "total_increasing", label
+
+
+def test_a_period_of_energy_has_no_state_class(catalogue):
+    # Home Assistant refuses "measurement" for energy, and a rolling window is
+    # not monotonic, so "total_increasing" would be wrong as well.
+    for label in ("Avgiven värme/30 dagar", "Tillförd energi/30 dagar", "Avgiven kyla/30 dagar",
+                  "Energi el/30 dagar", "Energy output/30 days", "Avgiven energi/24h"):
+        assert catalogue.display_state_class("kWh", label) is None, label
+
+
+def test_other_readings_stay_measurements(catalogue):
+    assert catalogue.display_state_class("kW", "Avgiven värme") == "measurement"
+    assert catalogue.display_state_class("°C", "Hetgas") == "measurement"
+    assert catalogue.display_state_class("%", "Laddpump") == "measurement"
+    assert catalogue.display_state_class(None, "Status") is None

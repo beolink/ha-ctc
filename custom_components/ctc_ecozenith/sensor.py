@@ -24,6 +24,7 @@ from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.const import EntityCategory
 
 from . import CtcConfigEntry
+from .catalogue import display_state_class
 from .cop import current_totals
 from .const import DOMAIN, ModbusSensor, SlowValue
 
@@ -159,7 +160,10 @@ class CtcDisplaySensor(CoordinatorEntity, SensorEntity):
         device_class = UNIT_TO_CLASS.get(unit or "")
         if device_class is not None:
             self._attr_device_class = device_class
-        if unit:
+        state_class = display_state_class(unit, value.label)
+        if state_class == "total_increasing":
+            self._attr_state_class = SensorStateClass.TOTAL_INCREASING
+        elif state_class == "measurement":
             self._attr_state_class = SensorStateClass.MEASUREMENT
         # Only a handful of these are interesting to most people; the rest are
         # created but left switched off so the entity list stays usable.
