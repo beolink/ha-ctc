@@ -341,3 +341,111 @@ def test_complete_only_when_every_field_is_known(identity):
     full = identity.Identity(serial="1", mac="2", display_firmware="3",
                              bootloader="4", heatpump_model="5", heatpump_firmware="6")
     assert full.is_complete
+
+
+# ------------------------------------------------- the i360's older display
+
+
+def _row(const, label, unit="kWh", key=None, page=31):
+    return const.SlowValue(
+        key=key or label, label=label, page=page, screen=140, fmt="%d", var_indices=[1], unit=unit
+    )
+
+
+def test_the_older_heat_counter_is_found_on_an_i360_page(cop, const):
+    # CTC's text catalogue: 935 "Energy output (kWh)" is "Avgiven energi (kWh)",
+    # 936 is the same over 24 hours. The older page has no consumed energy row.
+    page = const.SlowPage(page=31, title="Lagrad driftinfo", screens=[140])
+    page.values = [
+        _row(const, "Total drifttid", unit="h"),
+        _row(const, "Avgiven energi/24h"),
+        _row(const, "Avgiven energi"),
+    ]
+    out, consumed = cop.find_energy_totals([page])
+    assert out is not None and out.label == "Avgiven energi"
+    assert consumed is None
+
+
+def test_the_older_heat_counter_is_found_in_english_too(cop, const):
+    page = const.SlowPage(page=31, title="Stored operation data", screens=[140])
+    page.values = [_row(const, "Energy output/24h"), _row(const, "Energy output")]
+    out, consumed = cop.find_energy_totals([page])
+    assert out is not None and out.label == "Energy output"
+    assert consumed is None
+
+
+def test_power_is_never_taken_for_the_heat_counter(cop, const):
+    # 1807 "Energy output (kW)", "Avgiven värme (kW)", is on the heat pump's
+    # operation data page: power, not energy.
+    page = const.SlowPage(page=22, title="Värmepump", screens=[118])
+    page.values = [_row(const, "Avgiven värme", unit="kW"), _row(const, "Energy output", unit="kW")]
+    assert cop.find_energy_totals([page]) == (None, None)
+
+
+def test_the_newer_names_win_over_the_older_one(cop, const):
+    page = const.SlowPage(page=30, title="Historik", screens=[128])
+    page.values = [
+        _row(const, "Avgiven energi"),
+        _row(const, "Avgiven värme totalt"),
+        _row(const, "Tillförd energi totalt"),
+    ]
+    out, consumed = cop.find_energy_totals([page])
+    assert out.label == "Avgiven värme totalt"
+    assert consumed.label == "Tillförd energi totalt"
+
+
+def test_modbus_consumption_is_only_a_real_reading(cop):
+    assert cop.modbus_consumption({"compressor_kwh": 9166}) == 9166.0
+    # A clean zero is an unused register on CTC, and the sentinels mean absent.
+    assert cop.modbus_consumption({"compressor_kwh": 0}) is None
+    assert cop.modbus_consumption({"compressor_kwh": 4294967295}) is None
+    assert cop.modbus_consumption({"compressor_kwh": True}) is None
+    assert cop.modbus_consumption({"compressor_kwh": "9166"}) is None
+    assert cop.modbus_consumption({}) is None
+    assert cop.modbus_consumption(None) is None
+
+
+def test_consumption_is_taken_when_the_display_was_read(cop):
+    snapshot = cop.ConsumptionSnapshot()
+    assert snapshot.value is None
+    snapshot.update("t1", {"compressor_kwh": 4000})
+    assert snapshot.value == 4000.0
+    # Modbus moves on between display reads; the pairing must not.
+    snapshot.update("t1", {"compressor_kwh": 4003})
+    assert snapshot.value == 4000.0
+    snapshot.update("t2", {"compressor_kwh": 4010})
+    assert snapshot.value == 4010.0
+    # Never read yet: nothing to pair with.
+    snapshot.update(None, {"compressor_kwh": 4020})
+    assert snapshot.value == 4010.0
+    # A new display read with no usable Modbus value gives no pairing at all.
+    snapshot.update("t3", {"compressor_kwh": 0})
+    assert snapshot.value is None
+
+
+def test_totals_use_modbus_where_the_display_has_no_consumption(cop):
+    from types import SimpleNamespace
+
+    snapshot = cop.ConsumptionSnapshot()
+    snapshot.update("t1", {"compressor_kwh": 4800})
+    runtime = SimpleNamespace(
+        web=SimpleNamespace(data={"out": 12000.0}),
+        energy_out=SimpleNamespace(key="out"),
+        energy_in=None,
+        consumption_snapshot=snapshot,
+    )
+    assert cop.current_totals(runtime) == (12000.0, 4800.0)
+
+
+def test_totals_prefer_the_display_counter_when_there_is_one(cop):
+    from types import SimpleNamespace
+
+    snapshot = cop.ConsumptionSnapshot()
+    snapshot.update("t1", {"compressor_kwh": 9000})
+    runtime = SimpleNamespace(
+        web=SimpleNamespace(data={"out": 22633.0, "in": 9166.0}),
+        energy_out=SimpleNamespace(key="out"),
+        energy_in=SimpleNamespace(key="in"),
+        consumption_snapshot=snapshot,
+    )
+    assert cop.current_totals(runtime) == (22633.0, 9166.0)

@@ -26,6 +26,14 @@ supplied power, which gives a real coefficient of performance, plus the
 expansion valve position, superheat, evaporation and condensation in bar, and
 the inverter's own voltages and currents.
 
+**The coefficient of performance over a day, a year and the lifetime.** Only the
+display counts delivered heat, on its history page, called stored operation data
+on older display software, so that page has to be among the harvested ones. The
+energy consumed comes from the display's own counter where it has one. The older
+software has none, and there it comes from Modbus register 62341 instead, which
+holds the same number: 9166 kWh against the display's 9166.0 on an i255. It is
+read at the moment the display is, so the two always form a pair.
+
 ## The catch with the display, and what the integration does about it
 
 Only the page the panel is currently showing is kept up to date. Every other
@@ -55,7 +63,8 @@ every form of them, on both models tested.
    the sweep finds nothing, type the address instead.
 3. Tick the display pages you want harvested. The menu is read from the unit
    itself, so the list matches your model and your installed options, in your
-   own language.
+   own language. For the coefficient of performance, tick the page with the
+   stored or historical operation data.
 
 Control entities are off by default. Turn them on under the integration's
 options if you want them.
@@ -92,6 +101,10 @@ frequent writing can destroy the controller.
   and 10000 and 32767, which are filtered out.
 - **The web interface is undocumented.** A firmware update can change it. Modbus
   is documented and will keep working.
+- **The coefficient of performance is untested on an i360.** Going by CTC's
+  manual, its stored operation data page counts delivered energy but not the
+  energy consumed, so the consumption comes from Modbus register 62341 there.
+  That has not been confirmed on a running unit yet.
 
 ## Anonymous statistics
 
@@ -100,7 +113,11 @@ version of the integration you run, your Home Assistant version and
 installation type, the country you have set in Home Assistant itself, an
 approximate position rounded to about 11 km, how many entities the integration
 created, which transports are in use, whether control is enabled, how many
-display pages are harvested and how many register reads failed.
+display pages are harvested and how many register reads failed. It also says
+whether a coefficient of performance is possible and, if not, why: whether the
+history page is harvested, whether the delivered heat counter was recognised on
+it, and whether the energy consumed comes from the display or from Modbus. Yes
+or no each time, never which page or what is on it.
 
 It also sends what the installation is made of and how well it performs: the
 indoor unit's model, the outdoor unit's model, the firmware in the display, in
@@ -120,7 +137,8 @@ own installation before anything is sent, and rounded again on the server, so a
 finer value does not exist in the database. Reports are stored per date, never per
 time of day, so they cannot show when anyone is home. What the backend accepts
 is a closed list with a pattern per field, so free text cannot be stored even
-by mistake. The numbers are public at <https://stats.rnet.se>.
+by mistake. The statistics sit behind a login at <https://stats.rnet.se> and are
+seen only by whoever runs the service.
 
 The point is to know which versions are actually in the field, which parts are
 worth maintaining and whether something is failing on units other than mine.

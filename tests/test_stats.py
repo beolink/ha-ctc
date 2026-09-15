@@ -276,3 +276,26 @@ def test_every_key_the_report_builds_gets_through_stats_py(stats_extra):
     )
     assert "firmwares" in payload
     assert set(payload) <= _stats_py_extra_keys()
+
+
+# ------------------------------------------------ why a COP is or is not there
+
+
+def test_cop_flags_are_left_out_while_unknown(stats_extra):
+    # A set-up that has not finished knows nothing about the pages yet.
+    assert set(_extra(stats_extra)["features"]) == {"modbus", "display", "control", "pages"}
+
+
+def test_cop_flags_are_plain_yes_or_no(stats_extra):
+    extra = _extra(
+        stats_extra,
+        history_page=["a page object, never sent"],
+        heat_counter=False,
+        consumption_counter=0,
+        consumption_modbus=True,
+    )
+    flags = {k: extra["features"][k] for k in
+             ("history_page", "heat_counter", "consumption_counter", "consumption_modbus")}
+    assert flags == {"history_page": True, "heat_counter": False,
+                     "consumption_counter": False, "consumption_modbus": True}
+    assert all(isinstance(v, bool) for v in flags.values())

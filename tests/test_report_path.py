@@ -131,3 +131,46 @@ def test_nothing_unpacks_the_figures_as_a_tuple():
                 offenders.append(node.lineno)
     assert not offenders, f"cop_for_report packas upp på rad {offenders}"
     assert "**cop_for_report(" in source, "rapporten får inte värmefaktorerna"
+
+
+def test_an_i360_reports_a_figure_from_modbus_consumption(cop, stats_extra):
+    # The older display has delivered heat but no consumed energy; Modbus 62341
+    # stands in, taken when the display was read.
+    snapshot = cop.ConsumptionSnapshot()
+    snapshot.update("read", {"compressor_kwh": 4800})
+    runtime = SimpleNamespace(
+        cop=cop.CopTracker(FakeStore()),
+        web=SimpleNamespace(data={"out": 12000.0}),
+        energy_out=_value("out", "Avgiven energi"),
+        energy_in=None,
+        consumption_snapshot=snapshot,
+    )
+    payload = stats_extra.build_extra(
+        "EcoZenith i360",
+        has_display=True,
+        control_enabled=False,
+        page_count=1,
+        read_failures=0,
+        heatpump_model="EA610M",
+        history_page=True,
+        heat_counter=True,
+        consumption_counter=False,
+        consumption_modbus=True,
+        **cop.cop_for_report(runtime),
+    )
+    assert payload["models"] == ["i360", "ea610m"]
+    assert payload["metrics"]["cop_lifetime"] == 2.5
+    assert payload["features"]["consumption_modbus"] is True
+    assert payload["features"]["consumption_counter"] is False
+
+
+def test_the_set_up_passes_every_flag_to_the_report():
+    # __init__.py cannot be imported without Home Assistant, so read it.
+    import pathlib
+
+    source = (
+        pathlib.Path(__file__).resolve().parent.parent
+        / "custom_components" / "ctc_ecozenith" / "__init__.py"
+    ).read_text(encoding="utf-8")
+    for flag in ("history_page", "heat_counter", "consumption_counter", "consumption_modbus"):
+        assert f"{flag}=" in source, f"__init__.py skickar inte {flag}"

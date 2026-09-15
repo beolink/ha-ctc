@@ -23,11 +23,13 @@ from homeassistant.helpers.storage import Store
 
 from .catalogue import pages_from_storage
 from .cop import (
+    ConsumptionSnapshot,
     CopTracker,
     cop_for_report,
     current_totals,
     find_energy_totals,
     find_operating_hours,
+    modbus_consumption,
 )
 from .const import (
     CONF_ENABLE_CONTROL,
@@ -103,6 +105,10 @@ def _stats_extra_for(hass: HomeAssistant, entry: CtcConfigEntry) -> dict[str, An
         display_firmware=runtime.identity.display_firmware,
         heatpump_firmware=runtime.identity.heatpump_firmware,
         control_firmware=(runtime.modbus.data or {}).get("control_sw"),
+        history_page=bool(runtime.operating_hours),
+        heat_counter=runtime.energy_out is not None,
+        consumption_counter=runtime.energy_in is not None,
+        consumption_modbus=modbus_consumption(runtime.modbus.data) is not None,
         **cop_for_report(runtime),
     )
 
@@ -163,6 +169,8 @@ class CtcRuntime:
     #: The two lifetime counters, once they turn up among the harvested pages.
     energy_out: Any | None = None
     energy_in: Any | None = None
+    #: Consumed energy from Modbus, where the display has no counter for it.
+    consumption_snapshot: ConsumptionSnapshot | None = None
     #: Candidate rows for the unit's powered-on hours; the largest is used.
     operating_hours: Any | None = None
 
@@ -261,7 +269,28 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         runtime.pages = pages
         runtime.energy_out, runtime.energy_in = find_energy_totals(pages)
         runtime.operating_hours = find_operating_hours(pages)
-        if runtime.energy_out is not None and runtime.energy_in is not None:
+        if (
+            runtime.energy_out is not None
+            and runtime.energy_in is None
+            and modbus_consumption(modbus.data) is not None
+        ):
+            # The older display software, as on an i360, counts delivered heat
+            # but not consumed energy. Modbus 62341 holds that number, and is
+            # taken at the moment the display is read so the two stay a pair.
+            # Registered before the platforms, so the sensors that listen to
+            # the same coordinator see the new pairing when they update.
+            snapshot = ConsumptionSnapshot()
+            heat_key = runtime.energy_out.key
+
+            def _take_consumption() -> None:
+                snapshot.update(web.read_at.get(heat_key), modbus.data)
+
+            _take_consumption()
+            entry.async_on_unload(web.async_add_listener(_take_consumption))
+            runtime.consumption_snapshot = snapshot
+        if runtime.energy_out is not None and (
+            runtime.energy_in is not None or runtime.consumption_snapshot is not None
+        ):
             runtime.cop = CopTracker(
                 Store(hass, 1, f"{DOMAIN}_{entry.entry_id}_cop")
             )

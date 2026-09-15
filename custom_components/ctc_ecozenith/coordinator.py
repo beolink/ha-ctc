@@ -12,7 +12,7 @@ and it puts the panel back when it is done.
 from __future__ import annotations
 
 import logging
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from homeassistant.core import HomeAssistant
@@ -135,6 +135,10 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self._on_home_page_found = on_home_page_found
         self._expected_page: int | None = None
         self.last_skip_reason: str | None = None
+        #: When each value was last actually read off the panel. The data keeps
+        #: a value through a skipped cycle, so this is the only way to tell a
+        #: fresh reading from a carried one.
+        self.read_at: dict[str, datetime] = {}
 
     async def _async_update_data(self) -> dict[str, Any]:
         if not self.pages:
@@ -187,10 +191,12 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                         values_by_screen[screen] = await self.client.async_vars(screen)
                     except CtcWebError as err:
                         _LOGGER.debug("Screen %s unreadable: %s", screen, err)
+                read_at = datetime.now(timezone.utc)
                 for value in page.values:
                     number = numeric_value(value, values_by_screen.get(value.screen, []))
                     if number is not None:
                         data[value.key] = number
+                        self.read_at[value.key] = read_at
         except CtcWebError as err:
             raise UpdateFailed(f"display read failed: {err}") from err
         finally:

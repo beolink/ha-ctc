@@ -147,6 +147,10 @@ def build_extra(
     display_firmware: Any = None,
     heatpump_firmware: Any = None,
     control_firmware: Any = None,
+    history_page: bool | None = None,
+    heat_counter: bool | None = None,
+    consumption_counter: bool | None = None,
+    consumption_modbus: bool | None = None,
     cop_day: Any = None,
     cop_year: Any = None,
     cop_first_year: Any = None,
@@ -176,6 +180,18 @@ def build_extra(
         },
         "errors": max(0, int(read_failures)),
     }
+
+    # Whether a coefficient of performance is possible at all, and if not, why:
+    # the history page is not among the harvested pages, the delivered heat
+    # counter is not recognised on it, or neither the display nor Modbus has
+    # the consumed energy. Yes or no only, never which page or what it says.
+    flags = {
+        "history_page": history_page,
+        "heat_counter": heat_counter,
+        "consumption_counter": consumption_counter,
+        "consumption_modbus": consumption_modbus,
+    }
+    payload["features"].update({k: bool(v) for k, v in flags.items() if v is not None})
 
     # The firmware in each board. Three separate versions, because a fault that
     # only shows up on one combination is exactly what this is for.

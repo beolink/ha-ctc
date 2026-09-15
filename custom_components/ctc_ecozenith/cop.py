@@ -1,8 +1,12 @@
 """Coefficient of performance over a rolling year.
 
 Modbus reports what the unit consumes but never what it delivers, so a real
-coefficient of performance is only possible with the display's two lifetime
-counters: energy output total and energy consumption total.
+coefficient of performance needs the display's lifetime counter for delivered
+heat. The consumed side comes from the display's own counter where it has one,
+as the i255 and the i550 Pro do, and otherwise from Modbus register 62341, which
+holds the same number: 9166 kWh against the i255 display's 9166,0 on 2026-09-15.
+CTC's manual for the i360 lists delivered energy on its stored operation data
+page but no consumed energy at all.
 
 Dividing those two gives the figure for the whole life of the machine, which
 flatters or punishes it for years nobody is asking about. A yearly figure needs
@@ -19,7 +23,7 @@ from dataclasses import dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
-from .const import COP_HISTORY_DAYS, COP_WINDOW_DAYS
+from .const import COP_HISTORY_DAYS, COP_WINDOW_DAYS, SENTINELS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -275,11 +279,29 @@ class CopTracker:
         )
 
 
+#: What makes a row a period rather than a lifetime total: "Avgiven energi/24h"
+#: and "Avgiven värme/30 dagar" sit right beside the totals.
+_NOT_A_TOTAL = ("/", "24", "30")
+
+#: The older name of the delivered heat counter. The display's text catalogue
+#: holds both generations (read off an i255 on 2026-09-15): text 935 "Energy
+#: output (kWh)", in Swedish "Avgiven energi (kWh)", which is the row CTC's
+#: manual shows on the i360's stored operation data page, beside 1808 "Energy
+#: output total (kWh)" / "Avgiven värme totalt (kWh)" that the i255 shows. The
+#: older generation has no consumed energy counter at all. The name is only
+#: trusted on a row in kWh: 1807 "Energy output (kW)" is power, and sits on the
+#: heat pump's operation data page.
+_HEAT_NAMES = ("energy output", "avgiven energi")
+
+
 def find_energy_totals(pages: list[Any]) -> tuple[Any | None, Any | None]:
     """Pick the two lifetime counters out of the harvested pages.
 
     Matched on the label the display itself printed, in English first and then
-    in Swedish, so it works whichever language the panel is set to.
+    in Swedish, so it works whichever language the integration reads the panel
+    in. The newer names win wherever they appear on the page; only without them
+    is the older name for delivered heat accepted. Consumed energy has no older
+    name, and comes from Modbus instead where the display lacks it.
     """
     from .const import (
         LABEL_ENERGY_IN_EN,
@@ -288,22 +310,74 @@ def find_energy_totals(pages: list[Any]) -> tuple[Any | None, Any | None]:
         LABEL_ENERGY_OUT_SV,
     )
 
-    def match(value: Any, english: str, swedish: str) -> bool:
+    def label(value: Any) -> str:
         # The catalogue strips a trailing unit from the row name, so the stored
         # label is "Avgiven värme totalt" rather than "... (kWh)".
-        label = (value.label or "").strip().casefold()
-        return label.startswith(english.casefold()) or label.startswith(swedish.casefold())
+        return (value.label or "").strip().casefold()
 
-    out = None
-    consumed = None
-    for page in pages:
-        for value in page.values:
-            if out is None and match(value, LABEL_ENERGY_OUT_EN, LABEL_ENERGY_OUT_SV):
-                out = value
-            elif consumed is None and match(value, LABEL_ENERGY_IN_EN, LABEL_ENERGY_IN_SV):
-                consumed = value
+    def exact(value: Any, english: str, swedish: str) -> bool:
+        return label(value).startswith(english.casefold()) or label(value).startswith(
+            swedish.casefold()
+        )
+
+    def loose(value: Any, names: tuple[str, ...]) -> bool:
+        text = label(value)
+        return (
+            (getattr(value, "unit", None) or "").casefold() == "kwh"
+            and text.startswith(names)
+            and not any(word in text for word in _NOT_A_TOTAL)
+        )
+
+    values = [value for page in pages for value in page.values]
+    out = next(
+        (v for v in values if exact(v, LABEL_ENERGY_OUT_EN, LABEL_ENERGY_OUT_SV)), None
+    ) or next((v for v in values if loose(v, _HEAT_NAMES)), None)
+    consumed = next(
+        (v for v in values if exact(v, LABEL_ENERGY_IN_EN, LABEL_ENERGY_IN_SV)), None
+    )
     return out, consumed
 
+
+#: Modbus register 62341, the energy the compressor has consumed, in kWh.
+MODBUS_CONSUMPTION_KEY = "compressor_kwh"
+
+
+def modbus_consumption(data: dict[str, Any] | None) -> float | None:
+    """The consumed energy from Modbus, or None where the register is not used.
+
+    A register that reads a clean zero is unused on CTC, not a new machine: no
+    coefficient of performance is worked out below 50 kWh anyway.
+    """
+    value = (data or {}).get(MODBUS_CONSUMPTION_KEY)
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return None
+    if value <= 0 or value in SENTINELS:
+        return None
+    return float(value)
+
+
+class ConsumptionSnapshot:
+    """Modbus's consumed energy as it stood when the display was last read.
+
+    The display is harvested every half hour by default and keeps its previous
+    value when a cycle is skipped, while Modbus is read every thirty seconds.
+    Dividing a stale delivered heat by a fresh consumption would move the daily
+    figure by up to half an hour of compressor running, so the consumption is
+    taken at the moment the delivered heat counter was actually read.
+    """
+
+    def __init__(self) -> None:
+        self.value: float | None = None
+        self._read_at: Any = None
+
+    def update(self, read_at: Any, modbus_data: dict[str, Any] | None) -> None:
+        """Take the Modbus reading if the display has been read since last time."""
+        if read_at is None or read_at == self._read_at:
+            return
+        self._read_at = read_at
+        # A Modbus value that is not usable right now must not be paired with
+        # the new display reading either; better no sample than a wrong one.
+        self.value = modbus_consumption(modbus_data)
 
 
 def find_operating_hours(pages: list[Any]) -> Any | None:
@@ -328,12 +402,20 @@ def find_operating_hours(pages: list[Any]) -> Any | None:
 
 
 def current_totals(runtime: Any) -> tuple[float | None, float | None]:
-    """The two lifetime counters as the display last reported them."""
+    """The two lifetime counters as they stood when the display was last read.
+
+    Consumption comes from the display's own counter where there is one, and
+    otherwise from the Modbus reading taken when delivered heat was read.
+    """
     if getattr(runtime, "web", None) is None:
         return None, None
     data = runtime.web.data or {}
     out = data.get(runtime.energy_out.key) if runtime.energy_out else None
-    consumed = data.get(runtime.energy_in.key) if runtime.energy_in else None
+    if runtime.energy_in is not None:
+        consumed = data.get(runtime.energy_in.key)
+    else:
+        snapshot = getattr(runtime, "consumption_snapshot", None)
+        consumed = snapshot.value if snapshot is not None else None
     return out, consumed
 
 

@@ -254,7 +254,11 @@ class CtcCopSensor(CoordinatorEntity, SensorEntity):
 
     @property
     def extra_state_attributes(self) -> dict[str, object]:
-        return self._result().as_attributes()
+        attributes = self._result().as_attributes()
+        attributes["tillförd energi ur"] = (
+            "displayen" if self._runtime.energy_in is not None else "Modbus 62341"
+        )
+        return attributes
 
     @property
     def available(self) -> bool:
