@@ -69,6 +69,69 @@ every form of them, on both models tested.
 Control entities are off by default. Turn them on under the integration's
 options if you want them.
 
+## The CTC EcoZenith page
+
+Setting the integration up adds a **CTC EcoZenith** entry to the sidebar on its
+own. There is nothing to configure and no button to press: the page is built
+the moment it is opened, from the entities the integration has at that moment,
+so it is never out of date.
+
+- **Overview.** Operation status, temperatures, hot water, energy with the
+  coefficient of performance, control, the compressor and refrigerant circuit,
+  the settings stored in the heat pump and what the unit says about itself.
+  The values that matter at a glance and every control are Home Assistant's own
+  tiles, with the controls inline: a mode is picked from a list, a setpoint is
+  stepped or slid. Longer lists are rows, full name on the left and the value on
+  the right.
+- **Display values.** One section per harvested display page, each row under
+  the name the panel itself prints.
+
+**Every value is explained.** Hover over a name to read what the value is, or
+tap it and the explanation is written out underneath, with where the value
+comes from (a Modbus register, and whether it is a stored setting or a volatile
+control register, or the display page and how often it is read) and a link to
+Home Assistant's own dialog for the entity. On a tile the icon still opens that
+dialog directly. The explanations come from CTC's BMS manual and CTC's own
+description of the operation data rows, and say so where a register's meaning
+is not confirmed on a running unit. They are in Swedish, like the entity names.
+
+**What is on the page is decided by your installation.** Heat pumps, indoor
+units, software revisions and settings differ, and the controller answers for
+hardware that is not fitted with a clean zero: a brine pump on an air to water
+heat pump, current sensors that were never installed, the refrigerant circuit of
+a unit whose compressor has never run. So a reading that your installation has
+only ever reported as zero is left off, and it turns up the first time it has a
+value. The integration remembers what it has seen, and the first time it runs it
+looks through the past year of Home Assistant's own statistics, so a compressor
+that is merely at rest right now is not mistaken for one that is missing. Status,
+controls and the settings stored in the heat pump are shown whatever they read.
+
+A reading with nothing to show, such as a sensor CTC reports as not fitted, a
+display page not reached yet or a yearly figure without a year of history, is
+hidden until it has a value, and a section goes when all of its readings have.
+Status and control are always shown. Entities you disable or hide are left off,
+and a name you give an entity is the name on the page. So are values from a
+display page that is no longer harvested, which stay in the entity registry as
+unavailable until you delete them.
+
+While the page is open it follows along: a reload of the integration, or an
+entity enabled, disabled or renamed, makes it fetch the new layout by itself.
+The page is read only, since the next opening would build it again anyway.
+
+The explanations need the integration's card script, which is added as a
+Lovelace resource on its own. A browser that already has Home Assistant open
+loads resources once per page load, so **reload the page once after installing
+or updating** the integration. Where resources are managed in
+`configuration.yaml` the script is injected into the frontend instead; should
+the page show errors for `ctc-ecozenith-tile` there, add
+`/ctc_ecozenith/ctc-ecozenith-card.js` as a `module` resource yourself.
+
+Home Assistant has no public call for adding a dashboard from an integration, so
+the page is registered the way Lovelace registers a dashboard from
+`configuration.yaml`, and checked before use. If a later Home Assistant moves
+those parts, the integration logs it and runs on without the page. An address
+that is already taken, `/ctc-ecozenith`, is left alone.
+
 ## Control
 
 Control writes only to CTC's volatile 1000 block: maximum compressor speed,
@@ -77,6 +140,11 @@ zone mode. Those registers are not stored in EEPROM, so they can be written as
 often as needed, and the controller forgets them roughly five minutes after the
 last write. That expiry is the safety net. If Home Assistant stops, the heat
 pump quietly returns to its own settings.
+
+A mode is released by choosing *Släpp styrningen*. A setpoint has no such
+position, so **Släpp all styrning** stops every override at once: Home Assistant
+stops writing, and the controller goes back to its own settings within about
+five minutes.
 
 The stored settings in the 61500 block are exposed read only and never written.
 CTC states plainly that the number of write cycles there is limited and that

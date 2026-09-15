@@ -49,6 +49,13 @@ class CtcControlSelect(SelectEntity):
         if register.icon:
             self._attr_icon = register.icon
 
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # Written whenever an override changes, including "Släpp all styrning".
+        self.async_on_remove(
+            self._runtime.control.async_add_listener(self.async_write_ha_state)
+        )
+
     @property
     def current_option(self) -> str:
         raw = self._runtime.control.get(self._register.address)
@@ -66,7 +73,6 @@ class CtcControlSelect(SelectEntity):
     async def async_select_option(self, option: str) -> None:
         if option == RELEASE:
             await self._runtime.control.async_set(self._register.address, None)
-            self.async_write_ha_state()
             return
         for raw, label in self._enum.items():
             if label == option:
@@ -75,5 +81,4 @@ class CtcControlSelect(SelectEntity):
                 except CtcModbusError as err:
                     _LOGGER.error("Could not write %s: %s", self._register.name, err)
                     raise
-                self.async_write_ha_state()
                 return

@@ -23,6 +23,7 @@ from homeassistant.const import (
 )
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
+from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
 from . import CtcConfigEntry
 from .const import CONTROL_NUMBERS, DOMAIN, ControlRegister
@@ -51,14 +52,19 @@ async def async_setup_entry(
     )
 
 
-class CtcControlNumber(NumberEntity):
-    """One volatile control register exposed as a number."""
+class CtcControlNumber(CoordinatorEntity, NumberEntity):
+    """One volatile control register exposed as a number.
+
+    Follows the Modbus coordinator because, with no override in force, it shows
+    the unit's own setting, which someone can change at the panel at any time.
+    """
 
     _attr_has_entity_name = True
     _attr_mode = NumberMode.BOX
     _attr_entity_category = EntityCategory.CONFIG
 
     def __init__(self, runtime, register: ControlRegister) -> None:
+        super().__init__(runtime.modbus)
         self._runtime = runtime
         self._register = register
         host = next(iter(runtime.device["identifiers"]))[1]
@@ -73,6 +79,13 @@ class CtcControlNumber(NumberEntity):
         )
         if register.icon:
             self._attr_icon = register.icon
+
+    async def async_added_to_hass(self) -> None:
+        await super().async_added_to_hass()
+        # "Släpp all styrning" changes what this shows without writing through it.
+        self.async_on_remove(
+            self._runtime.control.async_add_listener(self.async_write_ha_state)
+        )
 
     @property
     def native_value(self) -> float | None:
@@ -104,4 +117,3 @@ class CtcControlNumber(NumberEntity):
         except CtcModbusError as err:
             _LOGGER.error("Could not write %s: %s", self._register.name, err)
             raise
-        self.async_write_ha_state()

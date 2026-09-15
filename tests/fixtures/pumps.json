@@ -1,0 +1,1065 @@
+{
+ "vsh": {
+  "name": "CTC EcoZenith i255",
+  "entities": {
+   "control_sw": "sensor.ctc_ecozenith_i255_programversion_styrenhet",
+   "p30_hogsta_framledning": "sensor.ctc_ecozenith_i255_driftinfo_historik_hogsta_framledning",
+   "p30_energi_el_total": "sensor.ctc_ecozenith_i255_driftinfo_historik_energi_el_total",
+   "p30_emxxx": "sensor.ctc_ecozenith_i255_driftinfo_historik_emxxx",
+   "p30_avgiven_varme_totalt": "sensor.ctc_ecozenith_i255_driftinfo_historik_avgiven_varme_totalt",
+   "p30_energi_el_30_dagar": "sensor.ctc_ecozenith_i255_driftinfo_historik_energi_el_30_dagar",
+   "p30_avgiven_kyla_totalt": "sensor.ctc_ecozenith_i255_driftinfo_historik_avgiven_kyla_totalt",
+   "p30_tillford_energi_totalt": "sensor.ctc_ecozenith_i255_driftinfo_historik_tillford_energi_totalt",
+   "p30_avgiven_varme_30_dagar": "sensor.ctc_ecozenith_i255_driftinfo_historik_avgiven_varme_30_dagar",
+   "p30_avgiven_kyla_30_dagar": "sensor.ctc_ecozenith_i255_driftinfo_historik_avgiven_kyla_30_dagar",
+   "p30_tillford_energi_30_dagar": "sensor.ctc_ecozenith_i255_driftinfo_historik_tillford_energi_30_dagar",
+   "p30_medeltemperatur_ute_30_dagar": "sensor.ctc_ecozenith_i255_driftinfo_historik_medeltemperatur_ute_30_dagar",
+   "cop_year": "sensor.ctc_ecozenith_i255_arsvarmefaktor",
+   "cop_lifetime": "sensor.ctc_ecozenith_i255_varmefaktor_hela_livslangden",
+   "outdoor_temp": "sensor.ctc_ecozenith_i255_utetemperatur",
+   "system_status": "sensor.ctc_ecozenith_i255_systemstatus",
+   "hs1_flow_setpoint": "sensor.ctc_ecozenith_i255_framledning_borvarde_vs1",
+   "hs1_flow": "sensor.ctc_ecozenith_i255_framledning_vs1",
+   "return_temp": "sensor.ctc_ecozenith_i255_returtemperatur",
+   "hp1_status": "sensor.ctc_ecozenith_i255_varmepump_status",
+   "hp1_in": "sensor.ctc_ecozenith_i255_varmepump_in",
+   "hp1_out": "sensor.ctc_ecozenith_i255_varmepump_ut",
+   "hp1_discharge": "sensor.ctc_ecozenith_i255_hetgas",
+   "hp1_suction": "sensor.ctc_ecozenith_i255_suggas",
+   "hp1_high_pressure": "sensor.ctc_ecozenith_i255_hogtryck",
+   "hp1_low_pressure": "sensor.ctc_ecozenith_i255_lagtryck",
+   "hp1_brine_in": "sensor.ctc_ecozenith_i255_koldbarare_in",
+   "hp1_brine_out": "sensor.ctc_ecozenith_i255_koldbarare_ut",
+   "hp1_charge_pump": "sensor.ctc_ecozenith_i255_laddpump",
+   "hp1_brine_pump": "sensor.ctc_ecozenith_i255_brinepump",
+   "hp1_fan": "sensor.ctc_ecozenith_i255_flakt",
+   "degree_minutes": "sensor.ctc_ecozenith_i255_gradminuter",
+   "immersion_upper_kw": "sensor.ctc_ecozenith_i255_elpatron_ovre",
+   "immersion_lower_kw": "sensor.ctc_ecozenith_i255_elpatron_nedre",
+   "current_l1": "sensor.ctc_ecozenith_i255_strom_l1",
+   "current_l2": "sensor.ctc_ecozenith_i255_strom_l2",
+   "current_l3": "sensor.ctc_ecozenith_i255_strom_l3",
+   "immersion_kwh": "sensor.ctc_ecozenith_i255_elpatron_energi",
+   "hp1_rps": "sensor.ctc_ecozenith_i255_kompressorvarvtal",
+   "room_temp_1": "sensor.ctc_ecozenith_i255_rumstemperatur",
+   "compressor_hours": "sensor.ctc_ecozenith_i255_kompressordrifttid",
+   "hs1_status": "sensor.ctc_ecozenith_i255_varmesystem_status",
+   "dhw_temp": "sensor.ctc_ecozenith_i255_varmvatten",
+   "dhw_capacity": "sensor.ctc_ecozenith_i255_varmvattenkapacitet",
+   "sg_mode": "sensor.ctc_ecozenith_i255_smartgrid_lage",
+   "compressor_kwh": "sensor.ctc_ecozenith_i255_kompressorenergi",
+   "set_dhw_mode": "sensor.ctc_ecozenith_i255_installt_varmvattenlage",
+   "set_room_1": "sensor.ctc_ecozenith_i255_installd_rumstemperatur",
+   "set_heating_mode_1": "sensor.ctc_ecozenith_i255_installt_varmelage",
+   "compressor_running": "binary_sensor.ctc_ecozenith_i255_kompressor_i_drift",
+   "defrosting": "binary_sensor.ctc_ecozenith_i255_avfrostning",
+   "alarm": "binary_sensor.ctc_ecozenith_i255_larm",
+   "blocked": "binary_sensor.ctc_ecozenith_i255_blockerad",
+   "immersion_active": "binary_sensor.ctc_ecozenith_i255_elpatron_aktiv",
+   "smartgrid_active": "binary_sensor.ctc_ecozenith_i255_smartgrid_aktiv",
+   "p22_brine_in_ut_1": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_brine_in_ut_1",
+   "p22_brine_in_ut_2": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_brine_in_ut_2",
+   "p22_vp_in_ut_1": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_vp_in_ut_1",
+   "p22_vp_in_ut_2": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_vp_in_ut_2",
+   "p22_utetemperatur": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_utetemperatur",
+   "p22_givare_forangare_flakt_1": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_givare_forangare_flakt_1",
+   "p22_givare_forangare_flakt_2": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_givare_forangare_flakt_2",
+   "p22_hetgas_suggas_1": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_hetgas_suggas_1",
+   "p22_hetgas_suggas_2": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_hetgas_suggas_2",
+   "p22_hetgas_suggas_3": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_hetgas_suggas_3",
+   "p22_ac_choke": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_ac_choke",
+   "p22_inverter": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_inverter",
+   "p22_inverter_motoreffekt": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_inverter_motoreffekt",
+   "p22_kompressortemp": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_kompressortemp",
+   "p22_vatskeror_temp": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_vatskeror_temp",
+   "p22_avgiven_varme": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_avgiven_varme",
+   "p22_avgiven_kyla": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_avgiven_kyla",
+   "p22_tillford_effekt": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_tillford_effekt",
+   "p22_givare_2_forangare": "sensor.ctc_ecozenith_i255_driftinfo_varmepump_givare_2_forangare",
+   "cop_day": "sensor.ctc_ecozenith_i255_dygnsvarmefaktor",
+   "cop_first_year": "sensor.ctc_ecozenith_i255_varmefaktor_forsta_aret",
+   "ctl_max_rps": "number.ctc_ecozenith_i255_styr_max_varvtal",
+   "ctl_immersion_lower": "number.ctc_ecozenith_i255_styr_max_elpatron_nedre",
+   "ctl_immersion_upper": "number.ctc_ecozenith_i255_styr_max_elpatron_ovre",
+   "ctl_room_setpoint_1": "number.ctc_ecozenith_i255_styr_rumsborvarde",
+   "ctl_dhw_setpoint": "number.ctc_ecozenith_i255_styr_varmvattenborvarde",
+   "ctl_extra_dhw": "number.ctc_ecozenith_i255_styr_extra_varmvatten",
+   "ctl_price_mode": "select.ctc_ecozenith_i255_styr_elprislage",
+   "ctl_dhw_mode": "select.ctc_ecozenith_i255_styr_varmvattenlage",
+   "ctl_zone_mode_1": "select.ctc_ecozenith_i255_styr_driftlage_vs1"
+  },
+  "names": {
+   "control_sw": "Programversion styrenhet",
+   "p30_hogsta_framledning": "Driftinfo, Historik: Högsta framledning",
+   "p30_energi_el_total": "Driftinfo, Historik: Energi el total",
+   "p30_emxxx": "Driftinfo, Historik: EMXXX",
+   "p30_avgiven_varme_totalt": "Driftinfo, Historik: Avgiven värme totalt",
+   "p30_energi_el_30_dagar": "Driftinfo, Historik: Energi el/30 dagar",
+   "p30_avgiven_kyla_totalt": "Driftinfo, Historik: Avgiven kyla totalt",
+   "p30_tillford_energi_totalt": "Driftinfo, Historik: Tillförd energi totalt",
+   "p30_avgiven_varme_30_dagar": "Driftinfo, Historik: Avgiven värme/30 dagar",
+   "p30_avgiven_kyla_30_dagar": "Driftinfo, Historik: Avgiven kyla/30 dagar",
+   "p30_tillford_energi_30_dagar": "Driftinfo, Historik: Tillförd energi/30 dagar",
+   "p30_medeltemperatur_ute_30_dagar": "Driftinfo, Historik: Medeltemperatur ute/30 dagar",
+   "cop_year": "Årsvärmefaktor",
+   "cop_lifetime": "Värmefaktor, hela livslängden",
+   "outdoor_temp": "Utetemperatur",
+   "system_status": "Systemstatus",
+   "hs1_flow_setpoint": "Framledning börvärde VS1",
+   "hs1_flow": "Framledning VS1",
+   "return_temp": "Returtemperatur",
+   "hp1_status": "Värmepump status",
+   "hp1_in": "Värmepump in",
+   "hp1_out": "Värmepump ut",
+   "hp1_discharge": "Hetgas",
+   "hp1_suction": "Suggas",
+   "hp1_high_pressure": "Högtryck",
+   "hp1_low_pressure": "Lågtryck",
+   "hp1_brine_in": "Köldbärare in",
+   "hp1_brine_out": "Köldbärare ut",
+   "hp1_charge_pump": "Laddpump",
+   "hp1_brine_pump": "Brinepump",
+   "hp1_fan": "Fläkt",
+   "degree_minutes": "Gradminuter",
+   "immersion_upper_kw": "Elpatron övre",
+   "immersion_lower_kw": "Elpatron nedre",
+   "current_l1": "Ström L1",
+   "current_l2": "Ström L2",
+   "current_l3": "Ström L3",
+   "immersion_kwh": "Elpatron energi",
+   "hp1_rps": "Kompressorvarvtal",
+   "room_temp_1": "Rumstemperatur",
+   "compressor_hours": "Kompressordrifttid",
+   "hs1_status": "Värmesystem status",
+   "dhw_temp": "Varmvatten",
+   "dhw_capacity": "Varmvattenkapacitet",
+   "sg_mode": "SmartGrid-läge",
+   "compressor_kwh": "Kompressorenergi",
+   "set_dhw_mode": "Inställt varmvattenläge",
+   "set_room_1": "Inställd rumstemperatur",
+   "set_heating_mode_1": "Inställt värmeläge",
+   "compressor_running": "Kompressor i drift",
+   "defrosting": "Avfrostning",
+   "alarm": "Larm",
+   "blocked": "Blockerad",
+   "immersion_active": "Elpatron aktiv",
+   "smartgrid_active": "SmartGrid aktiv",
+   "p22_brine_in_ut_1": "Driftinfo Värmepump: Brine in/ut 1",
+   "p22_brine_in_ut_2": "Driftinfo Värmepump: Brine in/ut 2",
+   "p22_vp_in_ut_1": "Driftinfo Värmepump: VP in/ut 1",
+   "p22_vp_in_ut_2": "Driftinfo Värmepump: VP in/ut 2",
+   "p22_utetemperatur": "Driftinfo Värmepump: Utetemperatur",
+   "p22_givare_forangare_flakt_1": "Driftinfo Värmepump: Givare förångare/fläkt 1",
+   "p22_givare_forangare_flakt_2": "Driftinfo Värmepump: Givare förångare/fläkt 2",
+   "p22_hetgas_suggas_1": "Driftinfo Värmepump: Hetgas/Suggas 1",
+   "p22_hetgas_suggas_2": "Driftinfo Värmepump: Hetgas/Suggas 2",
+   "p22_hetgas_suggas_3": "Driftinfo Värmepump: Hetgas/Suggas 3",
+   "p22_ac_choke": "Driftinfo Värmepump: AC Choke",
+   "p22_inverter": "Driftinfo Värmepump: Inverter",
+   "p22_inverter_motoreffekt": "Driftinfo Värmepump: Inverter Motoreffekt",
+   "p22_kompressortemp": "Driftinfo Värmepump: Kompressortemp",
+   "p22_vatskeror_temp": "Driftinfo Värmepump: Vätskerör temp",
+   "p22_avgiven_varme": "Driftinfo Värmepump: Avgiven värme",
+   "p22_avgiven_kyla": "Driftinfo Värmepump: Avgiven kyla",
+   "p22_tillford_effekt": "Driftinfo Värmepump: Tillförd effekt",
+   "p22_givare_2_forangare": "Driftinfo Värmepump: Givare 2 förångare",
+   "cop_day": "Dygnsvärmefaktor",
+   "cop_first_year": "Värmefaktor, första året",
+   "ctl_max_rps": "Styr max varvtal",
+   "ctl_immersion_lower": "Styr max elpatron nedre",
+   "ctl_immersion_upper": "Styr max elpatron övre",
+   "ctl_room_setpoint_1": "Styr rumsbörvärde",
+   "ctl_dhw_setpoint": "Styr varmvattenbörvärde",
+   "ctl_extra_dhw": "Styr extra varmvatten",
+   "ctl_price_mode": "Styr elprisläge",
+   "ctl_dhw_mode": "Styr varmvattenläge",
+   "ctl_zone_mode_1": "Styr driftläge VS1"
+  },
+  "pages": [
+   {
+    "title": "Driftinfo Värmepump",
+    "values": [
+     {
+      "key": "p22_kompressor",
+      "label": "Kompressor",
+      "unit": null
+     },
+     {
+      "key": "p22_laddpump",
+      "label": "Laddpump",
+      "unit": null
+     },
+     {
+      "key": "p22_brine_in_ut_1",
+      "label": "Brine in/ut 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_brine_in_ut_2",
+      "label": "Brine in/ut 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_vp_in_ut_1",
+      "label": "VP in/ut 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_vp_in_ut_2",
+      "label": "VP in/ut 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_flode",
+      "label": "Flöde",
+      "unit": null
+     },
+     {
+      "key": "p22_utetemperatur",
+      "label": "Utetemperatur",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_givare_forangare_flakt_1",
+      "label": "Givare förångare/fläkt 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_givare_forangare_flakt_2",
+      "label": "Givare förångare/fläkt 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_timer_avfrostning",
+      "label": "Timer avfrostning",
+      "unit": null
+     },
+     {
+      "key": "p22_hetgas_suggas_1",
+      "label": "Hetgas/Suggas 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_hetgas_suggas_2",
+      "label": "Hetgas/Suggas 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_hetgas_suggas_3",
+      "label": "Hetgas/Suggas 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_overhettning_s_h_1",
+      "label": "Överhettning S/H 1",
+      "unit": null
+     },
+     {
+      "key": "p22_overhettning_s_h_2",
+      "label": "Överhettning S/H 2",
+      "unit": null
+     },
+     {
+      "key": "p22_overhettning_s_h_3",
+      "label": "Överhettning S/H 3",
+      "unit": null
+     },
+     {
+      "key": "p22_overhettning_s_h_4",
+      "label": "Överhettning S/H 4",
+      "unit": null
+     },
+     {
+      "key": "p22_forangning_c_bar_1",
+      "label": "Förångning °C/bar 1",
+      "unit": null
+     },
+     {
+      "key": "p22_forangning_c_bar_2",
+      "label": "Förångning °C/bar 2",
+      "unit": null
+     },
+     {
+      "key": "p22_kondensering_c_bar_1",
+      "label": "Kondensering °C/bar 1",
+      "unit": null
+     },
+     {
+      "key": "p22_kondensering_c_bar_2",
+      "label": "Kondensering °C/bar 2",
+      "unit": null
+     },
+     {
+      "key": "p22_expansionsventil",
+      "label": "Expansionsventil",
+      "unit": null
+     },
+     {
+      "key": "p22_strom",
+      "label": "Ström",
+      "unit": null
+     },
+     {
+      "key": "p22_ac_choke",
+      "label": "AC Choke",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_inverter",
+      "label": "Inverter",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_inverter_matningsspanning",
+      "label": "Inverter Matningsspänning",
+      "unit": null
+     },
+     {
+      "key": "p22_inverter_motorspanning",
+      "label": "Inverter Motorspänning",
+      "unit": null
+     },
+     {
+      "key": "p22_inverter_motorstrom",
+      "label": "Inverter Motorström",
+      "unit": null
+     },
+     {
+      "key": "p22_inverter_motoreffekt",
+      "label": "Inverter Motoreffekt",
+      "unit": "kW"
+     },
+     {
+      "key": "p22_inverter_dc_bus_spanning",
+      "label": "Inverter DC-Bus spänning",
+      "unit": null
+     },
+     {
+      "key": "p22_programversion_vp_styrkort",
+      "label": "Programversion VP-styrkort",
+      "unit": null
+     },
+     {
+      "key": "p22_kompressortemp",
+      "label": "Kompressortemp",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_vatskeror_temp",
+      "label": "Vätskerör temp",
+      "unit": "°C"
+     },
+     {
+      "key": "p22_avgiven_varme",
+      "label": "Avgiven värme",
+      "unit": "kW"
+     },
+     {
+      "key": "p22_avgiven_kyla",
+      "label": "Avgiven kyla",
+      "unit": "kW"
+     },
+     {
+      "key": "p22_tillford_effekt",
+      "label": "Tillförd effekt",
+      "unit": "kW"
+     },
+     {
+      "key": "p22_givare_2_forangare",
+      "label": "Givare 2 förångare",
+      "unit": "°C"
+     }
+    ]
+   },
+   {
+    "title": "Driftinfo, Historik",
+    "values": [
+     {
+      "key": "p30_total_drifttid",
+      "label": "Total drifttid",
+      "unit": null
+     },
+     {
+      "key": "p30_hogsta_framledning",
+      "label": "Högsta framledning",
+      "unit": "°C"
+     },
+     {
+      "key": "p30_energi_el_total",
+      "label": "Energi el total",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_emxxx",
+      "label": "EMXXX",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_varme_totalt",
+      "label": "Avgiven värme totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_drift_24_h_m_1",
+      "label": "Drift /24 h:m 1",
+      "unit": null
+     },
+     {
+      "key": "p30_drift_24_h_m_2",
+      "label": "Drift /24 h:m 2",
+      "unit": null
+     },
+     {
+      "key": "p30_antal_starter_24",
+      "label": "Antal starter /24",
+      "unit": null
+     },
+     {
+      "key": "p30_drifttid_total",
+      "label": "Drifttid total",
+      "unit": null
+     },
+     {
+      "key": "p30_antal_starter",
+      "label": "Antal starter",
+      "unit": null
+     },
+     {
+      "key": "p30_kritiska_larm_raknare_1",
+      "label": "Kritiska larm räknare 1",
+      "unit": null
+     },
+     {
+      "key": "p30_kritiska_larm_raknare_2",
+      "label": "Kritiska larm räknare 2",
+      "unit": null
+     },
+     {
+      "key": "p30_kritiska_larm_raknare_3",
+      "label": "Kritiska larm räknare 3",
+      "unit": null
+     },
+     {
+      "key": "p30_kritiska_larm_raknare_4",
+      "label": "Kritiska larm räknare 4",
+      "unit": null
+     },
+     {
+      "key": "p30_energi_el_30_dagar",
+      "label": "Energi el/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_kyla_totalt",
+      "label": "Avgiven kyla totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_tillford_energi_totalt",
+      "label": "Tillförd energi totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_varme_30_dagar",
+      "label": "Avgiven värme/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_kyla_30_dagar",
+      "label": "Avgiven kyla/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_tillford_energi_30_dagar",
+      "label": "Tillförd energi/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_medeltemperatur_ute_30_dagar",
+      "label": "Medeltemperatur ute/30 dagar",
+      "unit": "°C"
+     }
+    ]
+   }
+  ],
+  "energy_out": "p30_avgiven_varme_totalt",
+  "energy_in": "p30_tillford_energi_totalt",
+  "control_enabled": true,
+  "language": "sv"
+ },
+ "pt": {
+  "name": "CTC EcoZenith i550 Pro",
+  "entities": {
+   "outdoor_temp": "sensor.ctc_ecozenith_i550_pro_utetemperatur",
+   "dhw_stop_temp": "sensor.ctc_ecozenith_i550_pro_stopptemperatur_varmvatten",
+   "system_status": "sensor.ctc_ecozenith_i550_pro_systemstatus",
+   "hs1_flow_setpoint": "sensor.ctc_ecozenith_i550_pro_framledning_borvarde_vs1",
+   "hs1_flow": "sensor.ctc_ecozenith_i550_pro_framledning_vs1",
+   "return_temp": "sensor.ctc_ecozenith_i550_pro_returtemperatur",
+   "hp1_status": "sensor.ctc_ecozenith_i550_pro_varmepump_status",
+   "hp1_in": "sensor.ctc_ecozenith_i550_pro_varmepump_in",
+   "hp1_out": "sensor.ctc_ecozenith_i550_pro_varmepump_ut",
+   "hp1_discharge": "sensor.ctc_ecozenith_i550_pro_hetgas",
+   "hp1_suction": "sensor.ctc_ecozenith_i550_pro_suggas",
+   "hp1_high_pressure": "sensor.ctc_ecozenith_i550_pro_hogtryck",
+   "hp1_low_pressure": "sensor.ctc_ecozenith_i550_pro_lagtryck",
+   "hp1_brine_in": "sensor.ctc_ecozenith_i550_pro_koldbarare_in",
+   "hp1_brine_out": "sensor.ctc_ecozenith_i550_pro_koldbarare_ut",
+   "hp1_charge_pump": "sensor.ctc_ecozenith_i550_pro_laddpump",
+   "hp1_brine_pump": "sensor.ctc_ecozenith_i550_pro_brinepump",
+   "hp1_fan": "sensor.ctc_ecozenith_i550_pro_flakt",
+   "hp1_outdoor_temp": "sensor.ctc_ecozenith_i550_pro_utetemperatur_vid_varmepump",
+   "degree_minutes": "sensor.ctc_ecozenith_i550_pro_gradminuter",
+   "immersion_upper_kw": "sensor.ctc_ecozenith_i550_pro_elpatron_ovre",
+   "immersion_lower_kw": "sensor.ctc_ecozenith_i550_pro_elpatron_nedre",
+   "current_l1": "sensor.ctc_ecozenith_i550_pro_strom_l1",
+   "current_l2": "sensor.ctc_ecozenith_i550_pro_strom_l2",
+   "current_l3": "sensor.ctc_ecozenith_i550_pro_strom_l3",
+   "immersion_kwh": "sensor.ctc_ecozenith_i550_pro_elpatron_energi",
+   "hp1_rps": "sensor.ctc_ecozenith_i550_pro_kompressorvarvtal",
+   "room_temp_1": "sensor.ctc_ecozenith_i550_pro_rumstemperatur",
+   "compressor_hours": "sensor.ctc_ecozenith_i550_pro_kompressordrifttid",
+   "compressor_hours_24h": "sensor.ctc_ecozenith_i550_pro_kompressordrift_senaste_dygnet",
+   "hs1_status": "sensor.ctc_ecozenith_i550_pro_varmesystem_status",
+   "dhw_temp": "sensor.ctc_ecozenith_i550_pro_varmvatten",
+   "dhw_capacity": "sensor.ctc_ecozenith_i550_pro_varmvattenkapacitet",
+   "sg_mode": "sensor.ctc_ecozenith_i550_pro_smartgrid_lage",
+   "compressor_kwh": "sensor.ctc_ecozenith_i550_pro_kompressorenergi",
+   "set_dhw_mode": "sensor.ctc_ecozenith_i550_pro_installt_varmvattenlage",
+   "set_room_1": "sensor.ctc_ecozenith_i550_pro_installd_rumstemperatur",
+   "set_heating_mode_1": "sensor.ctc_ecozenith_i550_pro_installt_varmelage",
+   "compressor_running": "binary_sensor.ctc_ecozenith_i550_pro_kompressor_i_drift",
+   "defrosting": "binary_sensor.ctc_ecozenith_i550_pro_avfrostning",
+   "alarm": "binary_sensor.ctc_ecozenith_i550_pro_larm",
+   "blocked": "binary_sensor.ctc_ecozenith_i550_pro_blockerad",
+   "immersion_active": "binary_sensor.ctc_ecozenith_i550_pro_elpatron_aktiv",
+   "smartgrid_active": "binary_sensor.ctc_ecozenith_i550_pro_smartgrid_aktiv",
+   "control_sw": "sensor.ctc_ecozenith_i550_pro_programversion_styrenhet",
+   "p23_varde_3": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_varde_3",
+   "p23_varde_4": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_varde_4",
+   "p23_varde_5": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_varde_5",
+   "p23_varde_6": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_varde_6",
+   "p23_ctc_ecozenith_i550_pro_1": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_1",
+   "p23_ctc_ecozenith_i550_pro_2": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_2",
+   "p23_ctc_ecozenith_i550_pro_3": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_3",
+   "p23_ctc_ecozenith_i550_pro_4": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_4",
+   "p23_ctc_ecozenith_i550_pro_5": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_5",
+   "p23_ctc_ecozenith_i550_pro_6": "sensor.ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_ctc_ecozenith_i550_pro_6",
+   "p58_tank_ovre_1": "sensor.ctc_ecozenith_i550_pro_styrenhet_tank_ovre_1",
+   "p58_tank_ovre_2": "sensor.ctc_ecozenith_i550_pro_styrenhet_tank_ovre_2",
+   "p58_tank_ovre_3": "sensor.ctc_ecozenith_i550_pro_styrenhet_tank_ovre_3",
+   "p58_tank_nedre_1": "sensor.ctc_ecozenith_i550_pro_styrenhet_tank_nedre_1",
+   "p58_tank_nedre_2": "sensor.ctc_ecozenith_i550_pro_styrenhet_tank_nedre_2",
+   "p58_kyltank_1": "sensor.ctc_ecozenith_i550_pro_styrenhet_kyltank_1",
+   "p58_kyltank_2": "sensor.ctc_ecozenith_i550_pro_styrenhet_kyltank_2",
+   "p58_elpatron_1": "sensor.ctc_ecozenith_i550_pro_styrenhet_elpatron_1",
+   "p58_elpatron_2": "sensor.ctc_ecozenith_i550_pro_styrenhet_elpatron_2",
+   "p24_tank_ovre_1": "sensor.ctc_ecozenith_i550_pro_varmvatten_tank_ovre_1",
+   "p24_tank_ovre_2": "sensor.ctc_ecozenith_i550_pro_varmvatten_tank_ovre_2",
+   "p24_tank_ovre_3": "sensor.ctc_ecozenith_i550_pro_varmvatten_tank_ovre_3",
+   "p24_vv_tank_1": "sensor.ctc_ecozenith_i550_pro_varmvatten_vv_tank_1",
+   "p24_vv_tank_2": "sensor.ctc_ecozenith_i550_pro_varmvatten_vv_tank_2",
+   "p24_vv_tank_3": "sensor.ctc_ecozenith_i550_pro_varmvatten_vv_tank_3",
+   "p24_extern_vv_tank": "sensor.ctc_ecozenith_i550_pro_varmvatten_extern_vv_tank",
+   "p27_ext_bufferttank_nedre_1": "sensor.ctc_ecozenith_i550_pro_extern_bufferttank_ext_bufferttank_nedre_1",
+   "p27_ext_bufferttank_nedre_2": "sensor.ctc_ecozenith_i550_pro_extern_bufferttank_ext_bufferttank_nedre_2",
+   "p27_tank_nedre_1": "sensor.ctc_ecozenith_i550_pro_extern_bufferttank_tank_nedre_1",
+   "p27_tank_nedre_2": "sensor.ctc_ecozenith_i550_pro_extern_bufferttank_tank_nedre_2",
+   "p27_laddstart": "sensor.ctc_ecozenith_i550_pro_extern_bufferttank_laddstart",
+   "p30_emxxx": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_emxxx",
+   "p30_medeltemperatur_ute_30_dagar_1": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_medeltemperatur_ute_30_dagar_1",
+   "p30_medeltemperatur_ute_30_dagar_2": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_medeltemperatur_ute_30_dagar_2",
+   "p30_avgiven_kyla_totalt": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_avgiven_kyla_totalt",
+   "p30_tillford_energi_totalt": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_tillford_energi_totalt",
+   "p30_avgiven_varme_30_dagar": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_avgiven_varme_30_dagar",
+   "p30_avgiven_kyla_30_dagar": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_avgiven_kyla_30_dagar",
+   "p30_tillford_energi_30_dagar": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_tillford_energi_30_dagar",
+   "p30_hogsta_framledning": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_hogsta_framledning",
+   "p30_energi_el_total": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_energi_el_total",
+   "p30_avgiven_varme_totalt": "sensor.ctc_ecozenith_i550_pro_historisk_driftinfo_avgiven_varme_totalt",
+   "cop_year": "sensor.ctc_ecozenith_i550_pro_arsvarmefaktor",
+   "cop_lifetime": "sensor.ctc_ecozenith_i550_pro_varmefaktor_hela_livslangden",
+   "cop_day": "sensor.ctc_ecozenith_i550_pro_dygnsvarmefaktor",
+   "cop_first_year": "sensor.ctc_ecozenith_i550_pro_varmefaktor_forsta_aret"
+  },
+  "names": {
+   "outdoor_temp": "Utetemperatur",
+   "dhw_stop_temp": "Stopptemperatur varmvatten",
+   "system_status": "Systemstatus",
+   "hs1_flow_setpoint": "Framledning börvärde VS1",
+   "hs1_flow": "Framledning VS1",
+   "return_temp": "Returtemperatur",
+   "hp1_status": "Värmepump status",
+   "hp1_in": "Värmepump in",
+   "hp1_out": "Värmepump ut",
+   "hp1_discharge": "Hetgas",
+   "hp1_suction": "Suggas",
+   "hp1_high_pressure": "Högtryck",
+   "hp1_low_pressure": "Lågtryck",
+   "hp1_brine_in": "Köldbärare in",
+   "hp1_brine_out": "Köldbärare ut",
+   "hp1_charge_pump": "Laddpump",
+   "hp1_brine_pump": "Brinepump",
+   "hp1_fan": "Fläkt",
+   "hp1_outdoor_temp": "Utetemperatur vid värmepump",
+   "degree_minutes": "Gradminuter",
+   "immersion_upper_kw": "Elpatron övre",
+   "immersion_lower_kw": "Elpatron nedre",
+   "current_l1": "Ström L1",
+   "current_l2": "Ström L2",
+   "current_l3": "Ström L3",
+   "immersion_kwh": "Elpatron energi",
+   "hp1_rps": "Kompressorvarvtal",
+   "room_temp_1": "Rumstemperatur",
+   "compressor_hours": "Kompressordrifttid",
+   "compressor_hours_24h": "Kompressordrift senaste dygnet",
+   "hs1_status": "Värmesystem status",
+   "dhw_temp": "Varmvatten",
+   "dhw_capacity": "Varmvattenkapacitet",
+   "sg_mode": "SmartGrid-läge",
+   "compressor_kwh": "Kompressorenergi",
+   "set_dhw_mode": "Inställt varmvattenläge",
+   "set_room_1": "Inställd rumstemperatur",
+   "set_heating_mode_1": "Inställt värmeläge",
+   "compressor_running": "Kompressor i drift",
+   "defrosting": "Avfrostning",
+   "alarm": "Larm",
+   "blocked": "Blockerad",
+   "immersion_active": "Elpatron aktiv",
+   "smartgrid_active": "SmartGrid aktiv",
+   "control_sw": "Programversion styrenhet",
+   "p23_varde_3": "CTC EcoZenith i550 Pro: Värde 3",
+   "p23_varde_4": "CTC EcoZenith i550 Pro: Värde 4",
+   "p23_varde_5": "CTC EcoZenith i550 Pro: Värde 5",
+   "p23_varde_6": "CTC EcoZenith i550 Pro: Värde 6",
+   "p23_ctc_ecozenith_i550_pro_1": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 1",
+   "p23_ctc_ecozenith_i550_pro_2": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 2",
+   "p23_ctc_ecozenith_i550_pro_3": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 3",
+   "p23_ctc_ecozenith_i550_pro_4": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 4",
+   "p23_ctc_ecozenith_i550_pro_5": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 5",
+   "p23_ctc_ecozenith_i550_pro_6": "CTC EcoZenith i550 Pro: CTC EcoZenith i550 Pro 6",
+   "p58_tank_ovre_1": "Styrenhet: Tank övre 1",
+   "p58_tank_ovre_2": "Styrenhet: Tank övre 2",
+   "p58_tank_ovre_3": "Styrenhet: Tank övre 3",
+   "p58_tank_nedre_1": "Styrenhet: Tank nedre 1",
+   "p58_tank_nedre_2": "Styrenhet: Tank nedre 2",
+   "p58_kyltank_1": "Styrenhet: Kyltank 1",
+   "p58_kyltank_2": "Styrenhet: Kyltank 2",
+   "p58_elpatron_1": "Styrenhet: Elpatron 1",
+   "p58_elpatron_2": "Styrenhet: Elpatron 2",
+   "p24_tank_ovre_1": "Varmvatten: Tank övre 1",
+   "p24_tank_ovre_2": "Varmvatten: Tank övre 2",
+   "p24_tank_ovre_3": "Varmvatten: Tank övre 3",
+   "p24_vv_tank_1": "Varmvatten: VV-tank 1",
+   "p24_vv_tank_2": "Varmvatten: VV-tank 2",
+   "p24_vv_tank_3": "Varmvatten: VV-tank 3",
+   "p24_extern_vv_tank": "Varmvatten: Extern VV-tank",
+   "p27_ext_bufferttank_nedre_1": "Extern bufferttank: Ext. Bufferttank nedre 1",
+   "p27_ext_bufferttank_nedre_2": "Extern bufferttank: Ext. Bufferttank nedre 2",
+   "p27_tank_nedre_1": "Extern bufferttank: Tank nedre 1",
+   "p27_tank_nedre_2": "Extern bufferttank: Tank nedre 2",
+   "p27_laddstart": "Extern bufferttank: Laddstart",
+   "p30_emxxx": "Historisk driftinfo: EMXXX",
+   "p30_medeltemperatur_ute_30_dagar_1": "Historisk driftinfo: Medeltemperatur ute/30 dagar 1",
+   "p30_medeltemperatur_ute_30_dagar_2": "Historisk driftinfo: Medeltemperatur ute/30 dagar 2",
+   "p30_avgiven_kyla_totalt": "Historisk driftinfo: Avgiven kyla totalt",
+   "p30_tillford_energi_totalt": "Historisk driftinfo: Tillförd energi totalt",
+   "p30_avgiven_varme_30_dagar": "Historisk driftinfo: Avgiven värme/30 dagar",
+   "p30_avgiven_kyla_30_dagar": "Historisk driftinfo: Avgiven kyla/30 dagar",
+   "p30_tillford_energi_30_dagar": "Historisk driftinfo: Tillförd energi/30 dagar",
+   "p30_hogsta_framledning": "Historisk driftinfo: Högsta framledning",
+   "p30_energi_el_total": "Historisk driftinfo: Energi el total",
+   "p30_avgiven_varme_totalt": "Historisk driftinfo: Avgiven värme totalt",
+   "cop_year": "Årsvärmefaktor",
+   "cop_lifetime": "Värmefaktor, hela livslängden",
+   "cop_day": "Dygnsvärmefaktor",
+   "cop_first_year": "Värmefaktor, första året"
+  },
+  "pages": [
+   {
+    "title": "CTC EcoZenith i550 Pro",
+    "values": [
+     {
+      "key": "p23_varde_3",
+      "label": "Värde 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_varde_4",
+      "label": "Värde 4",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_varde_5",
+      "label": "Värde 5",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_varde_6",
+      "label": "Värde 6",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_1",
+      "label": "CTC EcoZenith i550 Pro 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_2",
+      "label": "CTC EcoZenith i550 Pro 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_3",
+      "label": "CTC EcoZenith i550 Pro 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_4",
+      "label": "CTC EcoZenith i550 Pro 4",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_5",
+      "label": "CTC EcoZenith i550 Pro 5",
+      "unit": "°C"
+     },
+     {
+      "key": "p23_ctc_ecozenith_i550_pro_6",
+      "label": "CTC EcoZenith i550 Pro 6",
+      "unit": "°C"
+     }
+    ]
+   },
+   {
+    "title": "Varmvatten",
+    "values": [
+     {
+      "key": "p24_tank_ovre_1",
+      "label": "Tank övre 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_tank_ovre_2",
+      "label": "Tank övre 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_tank_ovre_3",
+      "label": "Tank övre 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_vv_tank_1",
+      "label": "VV-tank 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_vv_tank_2",
+      "label": "VV-tank 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_vv_tank_3",
+      "label": "VV-tank 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p24_extern_vv_tank",
+      "label": "Extern VV-tank",
+      "unit": "°C"
+     }
+    ]
+   },
+   {
+    "title": "Extern bufferttank",
+    "values": [
+     {
+      "key": "p27_ext_bufferttank_nedre_1",
+      "label": "Ext. Bufferttank nedre 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p27_ext_bufferttank_nedre_2",
+      "label": "Ext. Bufferttank nedre 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p27_tank_nedre_1",
+      "label": "Tank nedre 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p27_tank_nedre_2",
+      "label": "Tank nedre 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p27_laddstart",
+      "label": "Laddstart",
+      "unit": "°C"
+     }
+    ]
+   },
+   {
+    "title": "Historisk driftinfo",
+    "values": [
+     {
+      "key": "p30_total_drifttid_1",
+      "label": "Total drifttid 1",
+      "unit": null
+     },
+     {
+      "key": "p30_total_drifttid_2",
+      "label": "Total drifttid",
+      "unit": null
+     },
+     {
+      "key": "p30_total_drifttid_3",
+      "label": "Total drifttid 3",
+      "unit": null
+     },
+     {
+      "key": "p30_total_drifttid_4",
+      "label": "Total drifttid 4",
+      "unit": null
+     },
+     {
+      "key": "p30_total_drifttid_5",
+      "label": "Total drifttid 5",
+      "unit": null
+     },
+     {
+      "key": "p30_total_drifttid_6",
+      "label": "Total drifttid 6",
+      "unit": null
+     },
+     {
+      "key": "p30_emxxx",
+      "label": "EMXXX",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_antal_starter_24",
+      "label": "Antal starter /24",
+      "unit": null
+     },
+     {
+      "key": "p30_antal_starter",
+      "label": "Antal starter",
+      "unit": null
+     },
+     {
+      "key": "p30_medeltemperatur_ute_30_dagar_1",
+      "label": "Medeltemperatur ute/30 dagar 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p30_medeltemperatur_ute_30_dagar_2",
+      "label": "Medeltemperatur ute/30 dagar 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p30_avgiven_kyla_totalt",
+      "label": "Avgiven kyla totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_tillford_energi_totalt",
+      "label": "Tillförd energi totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_varme_30_dagar",
+      "label": "Avgiven värme/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_kyla_30_dagar",
+      "label": "Avgiven kyla/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_tillford_energi_30_dagar",
+      "label": "Tillförd energi/30 dagar",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_total_drifttid",
+      "label": "Total drifttid",
+      "unit": null
+     },
+     {
+      "key": "p30_hogsta_framledning",
+      "label": "Högsta framledning",
+      "unit": "°C"
+     },
+     {
+      "key": "p30_energi_el_total",
+      "label": "Energi el total",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_avgiven_varme_totalt",
+      "label": "Avgiven värme totalt",
+      "unit": "kWh"
+     },
+     {
+      "key": "p30_drift_24_h_m",
+      "label": "Drift /24 h:m",
+      "unit": null
+     }
+    ]
+   },
+   {
+    "title": "Värmesystem",
+    "values": [
+     {
+      "key": "p53_status_2",
+      "label": "Status 2",
+      "unit": null
+     },
+     {
+      "key": "p53_status_3",
+      "label": "Status 3",
+      "unit": null
+     },
+     {
+      "key": "p53_status_2_2",
+      "label": "Status 2",
+      "unit": null
+     },
+     {
+      "key": "p53_status_3_2",
+      "label": "Status 3",
+      "unit": null
+     },
+     {
+      "key": "p53_status_2_3",
+      "label": "Status 2",
+      "unit": null
+     },
+     {
+      "key": "p53_status_3_3",
+      "label": "Status 3",
+      "unit": null
+     },
+     {
+      "key": "p53_status_2_4",
+      "label": "Status 2",
+      "unit": null
+     },
+     {
+      "key": "p53_status_3_4",
+      "label": "Status 3",
+      "unit": null
+     }
+    ]
+   },
+   {
+    "title": "Styrenhet",
+    "values": [
+     {
+      "key": "p58_fordrojning_shuntventil",
+      "label": "Fördröjning shuntventil",
+      "unit": null
+     },
+     {
+      "key": "p58_tank_ovre_1",
+      "label": "Tank övre 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_tank_ovre_2",
+      "label": "Tank övre 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_tank_ovre_3",
+      "label": "Tank övre 3",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_tank_nedre_1",
+      "label": "Tank nedre 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_tank_nedre_2",
+      "label": "Tank nedre 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_kyltank_1",
+      "label": "Kyltank 1",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_kyltank_2",
+      "label": "Kyltank 2",
+      "unit": "°C"
+     },
+     {
+      "key": "p58_elpatron_1",
+      "label": "Elpatron 1",
+      "unit": "kW"
+     },
+     {
+      "key": "p58_elpatron_2",
+      "label": "Elpatron 2",
+      "unit": "kW"
+     },
+     {
+      "key": "p58_strom_l1_l2_l3",
+      "label": "Ström L1/L2/L3",
+      "unit": null
+     },
+     {
+      "key": "p58_emxxx_vln",
+      "label": "EMXXX VLN",
+      "unit": null
+     },
+     {
+      "key": "p58_emxxx",
+      "label": "EMXXX",
+      "unit": null
+     },
+     {
+      "key": "p58_emxxx_w",
+      "label": "EMXXX W",
+      "unit": null
+     },
+     {
+      "key": "p58_emxxx_va",
+      "label": "EMXXX VA",
+      "unit": null
+     },
+     {
+      "key": "p58_gradminut",
+      "label": "Gradminut",
+      "unit": null
+     },
+     {
+      "key": "p58_fordrojning_spets",
+      "label": "Fördröjning spets",
+      "unit": null
+     },
+     {
+      "key": "p58_tidsraknare_kyltank",
+      "label": "Tidsräknare kyltank",
+      "unit": null
+     },
+     {
+      "key": "p58_gradminutkyla",
+      "label": "Gradminutkyla",
+      "unit": null
+     }
+    ]
+   }
+  ],
+  "energy_out": "p30_avgiven_varme_totalt",
+  "energy_in": "p30_tillford_energi_totalt",
+  "control_enabled": false,
+  "language": "sv"
+ }
+}

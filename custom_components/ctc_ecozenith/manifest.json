@@ -1,11 +1,17 @@
 {
   "domain": "ctc_ecozenith",
   "name": "CTC EcoZenith",
+  "after_dependencies": [
+    "recorder"
+  ],
   "codeowners": [
     "@beolink"
   ],
   "config_flow": true,
   "dependencies": [
+    "frontend",
+    "http",
+    "lovelace",
     "network"
   ],
   "dhcp": [
@@ -23,5 +29,5 @@
   "requirements": [
     "pymodbus>=3.6.9"
   ],
-  "version": "0.7.2"
+  "version": "0.8.0"
 }

@@ -63,7 +63,7 @@ SENTINELS: Final = frozenset({9999, -9999, 10000, -10000, 32767, -32768, 4294967
 # The display's web server drops connections above roughly five in flight.
 WEB_MAX_CONCURRENCY: Final = 3
 
-PLATFORMS: Final = ["sensor", "binary_sensor", "number", "select"]
+PLATFORMS: Final = ["sensor", "binary_sensor", "number", "select", "button"]
 
 CONF_READ_TOTALS: Final = "read_totals"
 CONF_IDENTITY: Final = "identity"
@@ -155,13 +155,13 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
     # 62003 is documented as the hot water temperature but reads a constant 0 on
     # an i550 Pro, where 62276 is the live one. Off by default.
     ModbusSensor("dhw_temp_raw", 62003, "Varmvattentemperatur (62003)", 0.1, "°C", _T, enabled_default=False),
-    ModbusSensor("system_status", 62005, "Systemstatus", 1, None, None, None, enum=STATUS_SYSTEM),
+    ModbusSensor("system_status", 62005, "Systemstatus", 1, None, None, None, enum=STATUS_SYSTEM, icon="mdi:heat-pump"),
     ModbusSensor("radiator_temp", 62006, "Radiatorvatten", 0.1, "°C", _T, enabled_default=False),
     ModbusSensor("hs1_flow_setpoint", 62007, "Framledning börvärde VS1", 0.1, "°C", _T),
     ModbusSensor("hs1_flow", 62011, "Framledning VS1", 0.1, "°C", _T),
     ModbusSensor("return_temp", 62015, "Returtemperatur", 0.1, "°C", _T),
-    ModbusSensor("dhw_circulation", 62016, "Varmvattencirkulation", 1, None, None, None, enabled_default=False),
-    ModbusSensor("hp1_status", 62017, "Värmepump status", 1, None, None, None, enum=STATUS_HEATPUMP),
+    ModbusSensor("dhw_circulation", 62016, "Varmvattencirkulation", 1, None, None, None, enabled_default=False, icon="mdi:water-sync"),
+    ModbusSensor("hp1_status", 62017, "Värmepump status", 1, None, None, None, enum=STATUS_HEATPUMP, icon="mdi:heat-pump-outline"),
     ModbusSensor("hp1_in", 62027, "Värmepump in", 0.1, "°C", _T),
     ModbusSensor("hp1_out", 62037, "Värmepump ut", 0.1, "°C", _T),
     ModbusSensor("hp1_discharge", 62047, "Hetgas", 0.1, "°C", _T),
@@ -170,35 +170,35 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
     ModbusSensor("hp1_low_pressure", 62077, "Lågtryck", 0.1, "bar", "pressure"),
     ModbusSensor("hp1_brine_in", 62087, "Köldbärare in", 0.1, "°C", _T),
     ModbusSensor("hp1_brine_out", 62097, "Köldbärare ut", 0.1, "°C", _T),
-    ModbusSensor("hp1_charge_pump", 62107, "Laddpump", 0.1, "%", None),
-    ModbusSensor("hp1_brine_pump", 62117, "Brinepump", 0.1, "%", None),
-    ModbusSensor("hp1_fan", 62127, "Fläkt", 0.1, "%", None),
-    ModbusSensor("hp1_defrost_timer", 62137, "Avfrostningstimer", 1, None, None, enabled_default=False),
+    ModbusSensor("hp1_charge_pump", 62107, "Laddpump", 0.1, "%", None, icon="mdi:pump"),
+    ModbusSensor("hp1_brine_pump", 62117, "Brinepump", 0.1, "%", None, icon="mdi:pump"),
+    ModbusSensor("hp1_fan", 62127, "Fläkt", 0.1, "%", None, icon="mdi:fan"),
+    ModbusSensor("hp1_defrost_timer", 62137, "Avfrostningstimer", 1, None, None, enabled_default=False, icon="mdi:timer-sand"),
     ModbusSensor("hp1_outdoor_temp", 62147, "Utetemperatur vid värmepump", 0.1, "°C", _T, enabled_default=False),
-    ModbusSensor("degree_minutes", 62167, "Gradminuter", 1, None, None),
+    ModbusSensor("degree_minutes", 62167, "Gradminuter", 1, None, None, icon="mdi:counter"),
     ModbusSensor("immersion_upper_kw", 62168, "Elpatron övre", 0.1, "kW", _P),
     ModbusSensor("immersion_lower_kw", 62169, "Elpatron nedre", 0.1, "kW", _P),
     ModbusSensor("current_l1", 62171, "Ström L1", 0.1, "A", "current"),
     ModbusSensor("current_l2", 62172, "Ström L2", 0.1, "A", "current"),
     ModbusSensor("current_l3", 62173, "Ström L3", 0.1, "A", "current"),
     ModbusSensor("immersion_kwh", 62191, "Elpatron energi", 1, "kWh", _E, "total_increasing"),
-    ModbusSensor("hp1_rps", 62193, "Kompressorvarvtal", 0.1, "rps", None),
+    ModbusSensor("hp1_rps", 62193, "Kompressorvarvtal", 0.1, "rps", None, icon="mdi:speedometer"),
     ModbusSensor("room_temp_1", 62203, "Rumstemperatur", 0.1, "°C", _T),
     ModbusSensor("room_temp_2", 62204, "Rumstemperatur 2", 0.1, "°C", _T, enabled_default=False),
-    ModbusSensor("compressor_hours", 62214, "Kompressordrifttid", 1, "h", None, "total_increasing", count=2),
-    ModbusSensor("compressor_hours_24h", 62234, "Kompressordrift senaste dygnet", 1, "min", None, enabled_default=False),
-    ModbusSensor("hs1_status", 62246, "Värmesystem status", 1, None, None, None, enum=STATUS_HEATING_SYSTEM),
+    ModbusSensor("compressor_hours", 62214, "Kompressordrifttid", 1, "h", None, "total_increasing", count=2, icon="mdi:timer-outline"),
+    ModbusSensor("compressor_hours_24h", 62234, "Kompressordrift senaste dygnet", 1, "min", None, enabled_default=False, icon="mdi:timer-outline"),
+    ModbusSensor("hs1_status", 62246, "Värmesystem status", 1, None, None, None, enum=STATUS_HEATING_SYSTEM, icon="mdi:radiator"),
     ModbusSensor("tank_lower_setpoint", 62274, "Nedre tank börvärde", 0.1, "°C", _T, enabled_default=False),
     ModbusSensor("dhw_lower_temp", 62275, "Varmvatten nedre", 0.1, "°C", _T, enabled_default=False),
     ModbusSensor("dhw_temp", 62276, "Varmvatten", 0.1, "°C", _T),
-    ModbusSensor("dhw_capacity", 62279, "Varmvattenkapacitet", 1, "%", None),
+    ModbusSensor("dhw_capacity", 62279, "Varmvattenkapacitet", 1, "%", None, icon="mdi:water-percent"),
     # Pump and fan speeds carry one decimal: an EcoAir 720M running at 66.2 per
     # cent reports 662, which read as a whole number would be nonsense.
-    ModbusSensor("sg_mode", 62301, "SmartGrid-läge", 1, None, None, None, enum=SG_MODE),
+    ModbusSensor("sg_mode", 62301, "SmartGrid-läge", 1, None, None, None, enum=SG_MODE, icon="mdi:transmission-tower"),
     # The control unit's own software, which CTC reports as a number and a year
     # in two neighbouring registers. Diagnostics, so no state class.
-    ModbusSensor("control_sw", 62244, "Programversion styrenhet", 1, None, None, None),
-    ModbusSensor("control_sw_year", 62245, "Programversion styrenhet, år", 1, None, None, None, enabled_default=False),
+    ModbusSensor("control_sw", 62244, "Programversion styrenhet", 1, None, None, None, icon="mdi:chip"),
+    ModbusSensor("control_sw_year", 62245, "Programversion styrenhet, år", 1, None, None, None, enabled_default=False, icon="mdi:chip"),
     # 62331 is documented as supplied power per heat pump. On an i550 Pro it
     # reads 65.5 with the compressor stopped, which cannot be kilowatts, so it
     # is off by default until it can be confirmed on a running unit.
@@ -211,14 +211,14 @@ MODBUS_SENSORS: Final[tuple[ModbusSensor, ...]] = (
 # this block lives in EEPROM with a limited number of write cycles, so the
 # integration never writes here.
 MODBUS_SETTINGS: Final[tuple[ModbusSensor, ...]] = (
-    ModbusSensor("set_dhw_mode", 61500, "Inställt varmvattenläge", 1, None, None, None, enum=DHW_MODE),
-    ModbusSensor("set_extra_dhw", 61503, "Extra varmvatten kvar", 0.5, "h", None, enabled_default=False),
+    ModbusSensor("set_dhw_mode", 61500, "Inställt varmvattenläge", 1, None, None, None, enum=DHW_MODE, icon="mdi:water-boiler"),
+    ModbusSensor("set_extra_dhw", 61503, "Extra varmvatten kvar", 0.5, "h", None, enabled_default=False, icon="mdi:water-plus"),
     ModbusSensor("set_room_1", 61509, "Inställd rumstemperatur", 0.1, "°C", _T),
-    ModbusSensor("set_slope_1", 61513, "Kurvlutning", 0.1, None, None, enabled_default=False),
-    ModbusSensor("set_adjust_1", 61517, "Kurvjustering", 0.1, None, None, enabled_default=False),
-    ModbusSensor("set_hp1_blocked", 61521, "Värmepump tillåten", 1, None, None, None, enabled_default=False),
-    ModbusSensor("set_heating_mode_1", 61542, "Inställt värmeläge", 1, None, None, None, enum=HEATING_MODE),
-    ModbusSensor("set_max_rps_1", 61572, "Inställt max varvtal", 0.1, "rps", None, enabled_default=False),
+    ModbusSensor("set_slope_1", 61513, "Kurvlutning", 0.1, None, None, enabled_default=False, icon="mdi:chart-line-variant"),
+    ModbusSensor("set_adjust_1", 61517, "Kurvjustering", 0.1, None, None, enabled_default=False, icon="mdi:tune-vertical"),
+    ModbusSensor("set_hp1_blocked", 61521, "Värmepump tillåten", 1, None, None, None, enabled_default=False, icon="mdi:heat-pump-outline"),
+    ModbusSensor("set_heating_mode_1", 61542, "Inställt värmeläge", 1, None, None, None, enum=HEATING_MODE, icon="mdi:radiator"),
+    ModbusSensor("set_max_rps_1", 61572, "Inställt max varvtal", 0.1, "rps", None, enabled_default=False, icon="mdi:speedometer"),
     ModbusSensor("set_max_immersion_lower", 61590, "Max elpatron nedre", 0.1, "kW", _P, enabled_default=False),
     ModbusSensor("set_max_immersion_upper", 61591, "Max elpatron övre", 0.1, "kW", _P, enabled_default=False),
 )

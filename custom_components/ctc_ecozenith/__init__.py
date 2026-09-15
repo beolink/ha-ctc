@@ -21,6 +21,7 @@ from homeassistant.loader import async_get_integration
 
 from homeassistant.helpers.storage import Store
 
+from . import dashboard
 from .catalogue import pages_from_storage
 from .cop import (
     ConsumptionSnapshot,
@@ -55,6 +56,8 @@ from .const import (
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
 from .identity import Identity, async_read_identity
 from .modbus_api import CtcModbusClient
+from .seen import SeenValues
+from .seen_history import async_seed_from_statistics
 from .stats import async_setup_stats, async_stop_stats
 from .stats_extra import ErrorCounter, build_extra
 from .web_api import CtcWebClient
@@ -173,6 +176,8 @@ class CtcRuntime:
     consumption_snapshot: ConsumptionSnapshot | None = None
     #: Candidate rows for the unit's powered-on hours; the largest is used.
     operating_hours: Any | None = None
+    #: What this installation has ever given a value other than zero.
+    seen: SeenValues | None = None
 
 
 type CtcConfigEntry = ConfigEntry[CtcRuntime]
@@ -187,6 +192,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     options = entry.options
 
     await _async_arm_statistics(hass, entry)
+    # The sidebar page, before the first Modbus call for the same reason as the
+    # report: a controller that is away keeps the entry retrying, and the page
+    # should say so rather than vanish from the sidebar.
+    try:
+        integration = await async_get_integration(hass, DOMAIN)
+        await dashboard.async_register(hass, str(integration.version))
+    except Exception:  # noqa: BLE001 - the page must never break a set-up
+        _LOGGER.warning("Could not add the CTC EcoZenith page", exc_info=True)
 
     modbus_client = CtcModbusClient(host, modbus_port, slave)
     modbus = CtcModbusCoordinator(
@@ -296,6 +309,32 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
             )
             await runtime.cop.async_load()
 
+    # What this installation actually has, learnt from what it reports: CTC
+    # answers with a clean zero for hardware and registers it does not use.
+    seen = SeenValues(
+        Store(hass, 1, f"{DOMAIN}_{entry.entry_id}_seen"),
+        on_new=lambda: dashboard.async_announce_change(hass),
+    )
+    await seen.async_load()
+    for coordinator in (modbus, runtime.web):
+        if coordinator is None:
+            continue
+        seen.note(coordinator.data)
+        entry.async_on_unload(
+            coordinator.async_add_listener(
+                lambda coordinator=coordinator: seen.note(coordinator.data)
+            )
+        )
+    runtime.seen = seen
+    if seen.fresh:
+        # Once, with the recorder surely up: what the statistics already show.
+        from homeassistant.helpers.start import async_at_started
+
+        async def _seed(_hass: HomeAssistant) -> None:
+            await async_seed_from_statistics(hass, entry.entry_id, f"{DOMAIN}_{host}_", seen)
+
+        entry.async_on_unload(async_at_started(hass, _seed))
+
     entry.runtime_data = runtime
     try:
         await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
@@ -322,6 +361,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
             async_track_time_interval(hass, _record_cop, COP_SAMPLE_INTERVAL)
         )
 
+    dashboard.async_announce_change(hass)
     return True
 
 
@@ -339,4 +379,22 @@ async def async_unload_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool
         await async_stop_stats(hass, entry, DOMAIN)
         await runtime.control.async_stop()
         await runtime.modbus.client.async_close()
+        dashboard.async_announce_change(hass)
     return unloaded
+
+
+async def async_remove_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> None:
+    """Take the sidebar page away with the last heat pump.
+
+    Not on unload: a reload unloads the entry too, and removing the panel then
+    would throw anyone looking at the page back to the start page.
+    """
+    others = [
+        other
+        for other in hass.config_entries.async_entries(DOMAIN)
+        if other.entry_id != entry.entry_id
+    ]
+    if not others:
+        dashboard.async_unregister(hass)
+    # What the unit was seen to have belongs to this entry alone.
+    await Store(hass, 1, f"{DOMAIN}_{entry.entry_id}_seen").async_remove()

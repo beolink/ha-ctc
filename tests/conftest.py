@@ -86,3 +86,30 @@ def cop():
 @pytest.fixture(scope="session")
 def identity():
     return load("identity")
+
+
+@pytest.fixture(scope="session")
+def dashboard_views():
+    return load("dashboard_views")
+
+
+@pytest.fixture(scope="session")
+def explanations():
+    return load("explanations")
+
+
+@pytest.fixture(scope="session")
+def seen():
+    return load("seen")
+
+
+@pytest.fixture()
+def pumps() -> dict:
+    """The two houses' heat pumps as dashboard.py hands them over.
+
+    Built from the entity registries of an i255 with an EcoAir 720M and control
+    switched on, and of an i550 Pro without control, with display pages ticked.
+    """
+    import json
+
+    return json.loads((FIXTURES / "pumps.json").read_text(encoding="utf-8"))

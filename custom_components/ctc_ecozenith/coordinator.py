@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta, timezone
-from typing import Any
+from typing import Any, Callable
 
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
@@ -249,6 +249,7 @@ class CtcControlManager:
         self._client = client
         self._values: dict[int, int] = {}
         self._unsub = None
+        self._listeners: list[Callable[[], None]] = []
 
     @property
     def active(self) -> dict[int, int]:
@@ -257,14 +258,44 @@ class CtcControlManager:
     def get(self, address: int) -> int | None:
         return self._values.get(address)
 
+    def async_add_listener(self, listener: Callable[[], None]) -> Callable[[], None]:
+        """Call back whenever an override is set or released; returns the undo."""
+        self._listeners.append(listener)
+
+        def _remove() -> None:
+            if listener in self._listeners:
+                self._listeners.remove(listener)
+
+        return _remove
+
+    def _notify(self) -> None:
+        for listener in list(self._listeners):
+            listener()
+
     async def async_set(self, address: int, raw: int | None) -> None:
         """Set or release one control register."""
         if raw is None:
             self._values.pop(address, None)
+            self._notify()
             return
         self._values[address] = raw
         await self._client.async_write(address, raw)
         self._ensure_timer()
+        self._notify()
+
+    def async_release_all(self) -> None:
+        """Stop overriding anything and hand the unit back to its own settings.
+
+        Nothing is written: the controller forgets an override about five
+        minutes after the last write, so it is enough to stop writing. A number
+        has no release position of its own, which makes this the only way back
+        from one short of restarting Home Assistant.
+        """
+        self._values.clear()
+        if self._unsub is not None:
+            self._unsub()
+            self._unsub = None
+        self._notify()
 
     def _ensure_timer(self) -> None:
         if self._unsub is not None or not self._values:
