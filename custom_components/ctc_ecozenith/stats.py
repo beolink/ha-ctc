@@ -13,7 +13,10 @@ the same value on its own, without talking to each other; the instance id
 itself never leaves the house, and the server hashes the hash again before
 storing it. And the report carries how many warnings and errors the
 integration's own logger has written since the previous report: the counts
-only, never a message.
+only, never a message. It also carries the config entry's state, one of Home
+Assistant's own names for it, because an entry waiting to be set up again is
+exactly when an integration is not well, and Home Assistant logs that under its
+own logger, where the counter never sees it. Never the reason, which is text.
 
 Reporting is on by default and is switched off in the integration's options.
 Switching it off sends one last call that erases everything stored about this
@@ -26,6 +29,11 @@ Assistant for as long as the device stays away; if the reporter were tied to
 that attempt, the installation would fall silent exactly while something is
 wrong with it. Arm it before the first call that can raise, and stop it from
 ``async_unload_entry`` (which a failed attempt never reaches).
+
+Home Assistant also never reaches ``async_unload_entry`` when an entry is
+removed or disabled while it waits for another attempt: it cancels the retry and
+marks the entry not loaded. So before every report the reporter checks that its
+entry still exists and is not disabled, and otherwise stops itself for good.
 
 What is collected, and why: https://stats.rnet.se/integritet
 """
@@ -52,7 +60,8 @@ from homeassistant.helpers.system_info import async_get_system_info
 _LOGGER = logging.getLogger(__name__)
 
 ENDPOINT = "https://stats.rnet.se/api/v1/report"
-SCHEMA_VERSION = 1
+#: 3 added the config entry's state.
+SCHEMA_VERSION = 3
 
 #: Option key that controls reporting. On unless the user turns it off.
 OPTION_KEY = "send_statistics"
@@ -72,6 +81,21 @@ TIMEOUT = 10
 #: was missing here, so every integration sending it had its firmware dropped
 #: before the wire.
 EXTRA_KEYS = ("models", "features", "errors", "metrics", "firmware", "firmwares")
+
+#: Home Assistant's names for the states a config entry can be in. Only these
+#: are ever sent; anything else is left out rather than passed through.
+ENTRY_STATES = frozenset(
+    {
+        "loaded",
+        "setup_error",
+        "migration_error",
+        "setup_retry",
+        "not_loaded",
+        "failed_unload",
+        "setup_in_progress",
+        "unload_in_progress",
+    }
+)
 
 #: Decimals kept of the position. One decimal is roughly 11 km, which is enough
 #: for climate, price area and a readable map, and far too coarse to point at a
@@ -211,6 +235,9 @@ class StatsReporter:
 
         async def _first(_now) -> None:
             await self.async_report()
+            if not self._stopped and self._entry_gone():
+                # Removed or disabled while the report was on the wire.
+                await self._async_retire()
             if self._stopped:
                 # Unloaded while the report was on the wire: the handle that
                 # fired is already cancelled and nobody holds this reporter
@@ -231,6 +258,43 @@ class StatsReporter:
             cancel()
         self._cancel.clear()
         _release_log_counter(self.domain, self.entry.entry_id)
+
+    def _entry_gone(self) -> bool:
+        """True once the entry has been removed or disabled.
+
+        Home Assistant cancels a pending retry without calling
+        ``async_unload_entry`` in both cases, so nobody else will stop this
+        reporter. Never raises: statistics must not disturb anything.
+        """
+        try:
+            current = self.hass.config_entries.async_get_entry(self.entry.entry_id)
+            if current is None:
+                return True
+            # Home Assistant's disabler is a string enum ("user"). Anything else,
+            # such as the MagicMock in an integration's own tests, is not one.
+            return isinstance(getattr(current, "disabled_by", None), str)
+        except Exception:  # noqa: BLE001
+            return False
+
+    async def _async_retire(self) -> None:
+        """Stop for good and leave hass.data, but only if this is the reporter
+        kept there: a new set-up may already have armed another one."""
+        try:
+            reporters = self.hass.data.get(DATA_KEY)
+            key = (self.domain, self.entry.entry_id)
+            if isinstance(reporters, dict) and reporters.get(key) is self:
+                reporters.pop(key, None)
+            await self.async_stop()
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Could not stop the statistics reporter", exc_info=True)
+
+    def _entry_state(self) -> str | None:
+        """The entry's state by Home Assistant's own name, or None."""
+        try:
+            value = getattr(getattr(self.entry, "state", None), "value", None)
+        except Exception:  # noqa: BLE001
+            return None
+        return value if value in ENTRY_STATES else None
 
     async def _async_ha_id(self) -> str | None:
         """The id every beolink plugin on this Home Assistant arrives at on its
@@ -293,6 +357,7 @@ class StatsReporter:
             "lat": lat,
             "lon": lon,
             "ha_id": await self._async_ha_id(),
+            "entry_state": self._entry_state(),
         }
         counter = _log_counter_for(self.domain, self.entry.entry_id)
         if counter is not None:
@@ -310,6 +375,10 @@ class StatsReporter:
 
     async def async_report(self, _now=None) -> None:
         """Send one report. Goes quiet at the slightest problem."""
+        if self._entry_gone():
+            _LOGGER.debug("The %s entry is gone or disabled; statistics stopped", self.domain)
+            await self._async_retire()
+            return
         if not stats_enabled(self.entry):
             return
         try:
