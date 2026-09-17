@@ -22,6 +22,7 @@ from homeassistant.helpers.service_info.dhcp import DhcpServiceInfo
 
 from .catalogue import async_discover_pages, pages_from_storage, pages_to_storage
 from .const import (
+    CONF_CHECK_UPDATES,
     CONF_ENABLE_CONTROL,
     CONF_SEND_STATISTICS,
     CONF_FAST_INTERVAL,
@@ -399,6 +400,7 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                     **self._entry.options,
                     **pages,
                     CONF_VISIT_SYSTEM_INFO: bool(user_input.get(CONF_VISIT_SYSTEM_INFO, True)),
+                    CONF_CHECK_UPDATES: bool(user_input.get(CONF_CHECK_UPDATES, True)),
                     CONF_FAST_INTERVAL: int(user_input[CONF_FAST_INTERVAL]),
                     CONF_SLOW_INTERVAL: int(user_input[CONF_SLOW_INTERVAL]),
                     CONF_RESTORE_PAGE: user_input[CONF_RESTORE_PAGE],
@@ -461,6 +463,10 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_VISIT_SYSTEM_INFO,
                     default=options.get(CONF_VISIT_SYSTEM_INFO, True),
+                ): bool,
+                vol.Optional(
+                    CONF_CHECK_UPDATES,
+                    default=options.get(CONF_CHECK_UPDATES, True),
                 ): bool,
                 vol.Optional(
                     CONF_SEND_STATISTICS,

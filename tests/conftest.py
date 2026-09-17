@@ -89,6 +89,11 @@ def identity():
 
 
 @pytest.fixture(scope="session")
+def updates():
+    return load("updates")
+
+
+@pytest.fixture(scope="session")
 def dashboard_views():
     return load("dashboard_views")
 

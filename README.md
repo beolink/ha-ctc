@@ -82,7 +82,10 @@ off under Configure if you would rather open that page yourself.
 
 When something is left for you to do, it is said in Home Assistant's repairs
 view rather than only in the log: the page the coefficient of performance needs
-is not harvested, or the serial number has not been read yet.
+is not harvested, the serial number has not been read yet, or a newer version
+has been released. Home Assistant only offers updates for what HACS installed,
+so a copy put into `custom_components` by hand is never offered one; the release
+check asks GitHub once a day and can be switched off under Configure.
 
 Control entities are off by default. Turn them on under the integration's
 options if you want them.

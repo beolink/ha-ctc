@@ -17,6 +17,7 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.helpers import issue_registry as ir
 from homeassistant.loader import async_get_integration
 
@@ -34,6 +35,7 @@ from .cop import (
     modbus_consumption,
 )
 from .const import (
+    CONF_CHECK_UPDATES,
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
     CONF_IDENTITY,
@@ -45,6 +47,8 @@ from .const import (
     CONF_SLAVE,
     CONF_SLOW_INTERVAL,
     CONF_SLOW_PAGES,
+    RELEASES_API,
+    RELEASES_PAGE,
     CONF_VISIT_SYSTEM_INFO,
     CONF_WEB_PORT,
     DEFAULT_FAST_INTERVAL,
@@ -60,6 +64,7 @@ from .const import (
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
 from .identity import Identity, async_read_identity, async_read_identity_via_panel
 from .modbus_api import CtcModbusClient
+from .updates import async_latest_release, newer
 from .seen import SeenValues
 from .seen_history import async_seed_from_statistics
 from .stats import async_setup_stats, async_stop_stats
@@ -89,6 +94,39 @@ _MENU_READ: set[str] = set()
 
 ISSUE_HISTORY_PAGE = "history_page_missing"
 ISSUE_IDENTITY = "identity_incomplete"
+ISSUE_UPDATE_AVAILABLE = "update_available"
+
+#: How often GitHub is asked. Rarely: a release is not news that cannot wait.
+UPDATE_CHECK_INTERVAL = timedelta(hours=24)
+
+
+async def _async_check_release(
+    hass: HomeAssistant, entry: "CtcConfigEntry", version: str
+) -> None:
+    """Say in the repairs view when a newer release is out.
+
+    Home Assistant only knows about updates for what HACS installed, so a copy
+    put in place by hand is never offered one. Switched off in the options for
+    anyone who would rather not have the integration ask GitHub anything.
+    """
+    issue_id = f"{entry.entry_id}_{ISSUE_UPDATE_AVAILABLE}"
+    if not entry.options.get(CONF_CHECK_UPDATES, True):
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
+        return
+    latest = await async_latest_release(async_get_clientsession(hass), RELEASES_API)
+    if latest and newer(version, latest):
+        ir.async_create_issue(
+            hass,
+            DOMAIN,
+            issue_id,
+            is_fixable=False,
+            severity=ir.IssueSeverity.WARNING,
+            translation_key=ISSUE_UPDATE_AVAILABLE,
+            translation_placeholders={"installed": version, "latest": latest},
+            learn_more_url=RELEASES_PAGE,
+        )
+    else:
+        ir.async_delete_issue(hass, DOMAIN, issue_id)
 
 
 def _async_review_issues(
@@ -135,6 +173,7 @@ async def _async_catch_up(
     """
     changed: dict[str, Any] = {}
     options = entry.options
+    await _async_check_release(hass, entry, version)
     try:
         if options.get(CONF_MENU_VERSION) != version and entry.entry_id not in _MENU_READ:
             _MENU_READ.add(entry.entry_id)
@@ -452,6 +491,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     _async_review_issues(hass, entry, runtime)
 
     integration = await async_get_integration(hass, DOMAIN)
+    async def _release_tick(_now=None) -> None:
+        await _async_check_release(hass, entry, str(integration.version))
+
+    entry.async_on_unload(
+        async_track_time_interval(hass, _release_tick, UPDATE_CHECK_INTERVAL)
+    )
     entry.async_create_background_task(
         hass,
         _async_catch_up(hass, entry, runtime, web_client, str(integration.version)),
@@ -459,8 +504,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
     )
 
     if runtime.cop is not None:
-        from homeassistant.helpers.event import async_track_time_interval
-
         async def _record_cop(_now=None) -> None:
             out, consumed = current_totals(runtime)
             try:
