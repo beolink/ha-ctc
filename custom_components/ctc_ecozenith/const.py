@@ -27,6 +27,15 @@ CONF_WEB_PORT: Final = "web_port"
 CONF_SLAVE: Final = "slave"
 CONF_LANGUAGE: Final = "language"
 CONF_SLOW_PAGES: Final = "slow_pages"
+#: The whole menu as it was last read, not only the pages being harvested, so
+#: the tick boxes can be offered without walking the panel again.
+CONF_MENU: Final = "menu"
+#: The integration version that read the menu. A new version reads it again, so
+#: pages and rows a newer parser understands are picked up by themselves.
+CONF_MENU_VERSION: Final = "menu_version"
+#: Whether the panel may be walked to the system information page once, to read
+#: the serial number and the display's own software version.
+CONF_VISIT_SYSTEM_INFO: Final = "visit_system_info"
 CONF_SLOW_INTERVAL: Final = "slow_interval"
 CONF_PARK_PAGE: Final = "park_page"
 CONF_RESTORE_PAGE: Final = "restore_page"
@@ -49,6 +58,13 @@ LANG_SWEDISH: Final = 1
 # between models (532 on an i255, 570 on an i550 Pro) so the string is matched
 # instead of the id.
 OPERATION_DATA_LABEL_EN: Final = "Operation data"
+
+# The walk to the system information page taps nothing but these, by their
+# English label. The service menu next door holds a function test, a compressor
+# quick start, reinstallation and a firmware update, and the panel is shared
+# with whoever is standing at it, so anything unnamed is left alone.
+SYSTEM_INFO_LABEL_EN: Final = "System information"
+NAV_ALLOWED_EN: Final = ("Advanced", "Service", "Display", "System information")
 
 #: What makes a display row a period rather than a lifetime total: "Avgiven
 #: värme/30 dagar" and "Avgiven energi/24h" sit right beside the totals on the

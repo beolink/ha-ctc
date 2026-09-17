@@ -17,12 +17,13 @@ from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.device_registry import DeviceInfo
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.loader import async_get_integration
 
 from homeassistant.helpers.storage import Store
 
 from . import dashboard
-from .catalogue import pages_from_storage
+from .catalogue import async_discover_pages, merge_menu, pages_from_storage, pages_to_storage
 from .cop import (
     ConsumptionSnapshot,
     CopTracker,
@@ -36,12 +37,15 @@ from .const import (
     CONF_ENABLE_CONTROL,
     CONF_FAST_INTERVAL,
     CONF_IDENTITY,
+    CONF_MENU,
+    CONF_MENU_VERSION,
     CONF_LANGUAGE,
     CONF_MODBUS_PORT,
     CONF_RESTORE_PAGE,
     CONF_SLAVE,
     CONF_SLOW_INTERVAL,
     CONF_SLOW_PAGES,
+    CONF_VISIT_SYSTEM_INFO,
     CONF_WEB_PORT,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_MODBUS_PORT,
@@ -54,7 +58,7 @@ from .const import (
     SlowPage,
 )
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
-from .identity import Identity, async_read_identity
+from .identity import Identity, async_read_identity, async_read_identity_via_panel
 from .modbus_api import CtcModbusClient
 from .seen import SeenValues
 from .seen_history import async_seed_from_statistics
@@ -72,6 +76,108 @@ COP_SAMPLE_INTERVAL = timedelta(hours=6)
 
 
 _FAILURES: dict[str, ErrorCounter] = {}
+
+#: Entries whose panel has been walked to the system information page in this
+#: run. The walk moves the display, so it is attempted once, not at every
+#: reload, and only while the identity is still missing.
+_WALKED: set[str] = set()
+
+#: Entries whose menu has been read again in this run. A reading that failed
+#: because the display was busy is worth another try after a restart, but not
+#: at every reload: walking the menu moves the panel.
+_MENU_READ: set[str] = set()
+
+ISSUE_HISTORY_PAGE = "history_page_missing"
+ISSUE_IDENTITY = "identity_incomplete"
+
+
+def _async_review_issues(
+    hass: HomeAssistant, entry: "CtcConfigEntry", runtime: "CtcRuntime"
+) -> None:
+    """Say in the repairs view what only the owner can settle.
+
+    Two things the integration cannot do for itself: which pages the panel may
+    be walked to, and showing the system information page once so the display
+    writes its serial number into it.
+    """
+    def review(key: str, needed: bool) -> None:
+        issue_id = f"{entry.entry_id}_{key}"
+        if needed:
+            ir.async_create_issue(
+                hass,
+                DOMAIN,
+                issue_id,
+                is_fixable=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key=key,
+            )
+        else:
+            ir.async_delete_issue(hass, DOMAIN, issue_id)
+
+    review(ISSUE_HISTORY_PAGE, runtime.web is not None and runtime.energy_out is None)
+    review(ISSUE_IDENTITY, not runtime.identity.serial)
+
+
+async def _async_catch_up(
+    hass: HomeAssistant,
+    entry: "CtcConfigEntry",
+    runtime: "CtcRuntime",
+    client: CtcWebClient,
+    version: str,
+) -> None:
+    """Read the menu again after an update, and fill in a missing identity.
+
+    Both move the physical panel, so neither runs during set-up and neither runs
+    while the harvester is walking: the panel lock keeps them apart. A new
+    version reads the whole menu again, because a newer parser can make sense of
+    rows and pages the old one passed over, and pages nobody has switched off
+    are harvested.
+    """
+    changed: dict[str, Any] = {}
+    options = entry.options
+    try:
+        if options.get(CONF_MENU_VERSION) != version and entry.entry_id not in _MENU_READ:
+            _MENU_READ.add(entry.entry_id)
+            async with client.panel:
+                discovered = await async_discover_pages(client)
+            if discovered:
+                menu, selected = merge_menu(
+                    pages_from_storage(options.get(CONF_MENU)),
+                    [page.page for page in pages_from_storage(options.get(CONF_SLOW_PAGES))],
+                    discovered,
+                )
+                chosen = set(selected)
+                changed[CONF_MENU] = pages_to_storage(menu)
+                changed[CONF_SLOW_PAGES] = pages_to_storage(
+                    [page for page in menu if page.page in chosen]
+                )
+                # Only a reading that worked counts as done. A display that was
+                # busy is tried again after a restart, not at every reload.
+                changed[CONF_MENU_VERSION] = version
+            else:
+                _LOGGER.debug("The display's menu could not be read; keeping the stored one")
+
+        if (
+            not runtime.identity.serial
+            and options.get(CONF_VISIT_SYSTEM_INFO, True)
+            and entry.entry_id not in _WALKED
+        ):
+            _WALKED.add(entry.entry_id)
+            async with client.panel:
+                found = await async_read_identity_via_panel(
+                    client,
+                    restore=runtime.web.async_restore_page if runtime.web else None,
+                )
+            merged = runtime.identity.merged_with(found)
+            if merged.as_dict() != runtime.identity.as_dict():
+                changed[CONF_IDENTITY] = merged.as_dict()
+    except Exception as err:  # noqa: BLE001 - catching up must never break the entry
+        _LOGGER.debug("Could not catch up with the display: %s", err)
+
+    if changed:
+        # Writing the options reloads the entry, which is where the new pages
+        # and the new identity are picked up.
+        hass.config_entries.async_update_entry(entry, options={**entry.options, **changed})
 
 
 def _stats_extra_for(hass: HomeAssistant, entry: CtcConfigEntry) -> dict[str, Any]:
@@ -342,6 +448,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         await modbus_client.async_close()
         raise
     entry.async_on_unload(entry.add_update_listener(_async_reload))
+
+    _async_review_issues(hass, entry, runtime)
+
+    integration = await async_get_integration(hass, DOMAIN)
+    entry.async_create_background_task(
+        hass,
+        _async_catch_up(hass, entry, runtime, web_client, str(integration.version)),
+        f"{DOMAIN} catch up",
+    )
 
     if runtime.cop is not None:
         from homeassistant.helpers.event import async_track_time_interval

@@ -143,6 +143,10 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
     async def _async_update_data(self) -> dict[str, Any]:
         if not self.pages:
             return {}
+        async with self.client.panel:
+            return await self._async_harvest()
+
+    async def _async_harvest(self) -> dict[str, Any]:
         data: dict[str, Any] = dict(self.data or {})
         try:
             origin = await self.client.async_current_page()
@@ -213,6 +217,15 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if not data:
             raise UpdateFailed("no value could be read from the display")
         return data
+
+    async def async_restore_page(self, target: int) -> bool:
+        """Put the panel back on ``target``, for callers outside the harvest.
+
+        The caller holds ``client.panel``: this is handed to the walk that reads
+        the system information page, which takes the lock for its whole trip.
+        The lock is not reentrant, so taking it here would deadlock.
+        """
+        return await self._async_restore(target)
 
     async def _async_restore(self, target: int) -> bool:
         """Put the panel back, trying every way in that is known.

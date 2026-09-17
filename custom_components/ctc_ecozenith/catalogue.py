@@ -629,3 +629,21 @@ def pages_from_storage(stored: list[dict[str, Any]] | None) -> list[SlowPage]:
         except (KeyError, TypeError, ValueError) as err:
             _LOGGER.debug("Discarding a stored page: %s", err)
     return pages
+
+
+def merge_menu(
+    previous_menu: list[SlowPage],
+    previous_selection: list[int],
+    discovered: list[SlowPage],
+) -> tuple[list[SlowPage], list[int]]:
+    """Fold a fresh reading of the menu into what the user has already chosen.
+
+    A page switched off stays off, because that was a deliberate choice: every
+    harvested page means the panel is walked there and back. Anything the menu
+    has not offered before starts on, so a page a new version can use is used
+    without a visit to the options, and the first reading switches everything on.
+    """
+    known = {page.page for page in previous_menu}
+    switched_off = known - set(previous_selection)
+    selected = [page.page for page in discovered if page.page not in switched_off]
+    return discovered, selected

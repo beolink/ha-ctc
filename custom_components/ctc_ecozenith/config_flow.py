@@ -30,7 +30,10 @@ from .const import (
     CONF_RESTORE_PAGE,
     CONF_SLAVE,
     CONF_SLOW_INTERVAL,
+    CONF_MENU,
+    CONF_MENU_VERSION,
     CONF_SLOW_PAGES,
+    CONF_VISIT_SYSTEM_INFO,
     CONF_WEB_PORT,
     DEFAULT_FAST_INTERVAL,
     DEFAULT_MODBUS_PORT,
@@ -213,6 +216,8 @@ class CtcConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 },
                 options={
                     CONF_SLOW_PAGES: pages_to_storage(keep),
+                    CONF_MENU: pages_to_storage(self._pages),
+                    CONF_MENU_VERSION: await _async_version(self.hass),
                     CONF_SLOW_INTERVAL: int(
                         user_input.get(CONF_SLOW_INTERVAL, DEFAULT_SLOW_INTERVAL)
                     ),
@@ -255,7 +260,15 @@ class CtcConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="slow",
-            data_schema=_slow_schema(self._pages, [], DEFAULT_SLOW_INTERVAL, True),
+            # Every page is ticked to begin with: a page nobody harvests is a
+            # page whose values are missing, and switching one off afterwards
+            # is easier than discovering that something was never read.
+            data_schema=_slow_schema(
+                self._pages,
+                [page.page for page in self._pages],
+                DEFAULT_SLOW_INTERVAL,
+                True,
+            ),
             description_placeholders={
                 "model": self._model,
                 "count": str(len(self._pages)),
@@ -303,6 +316,13 @@ class CtcConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         entry: config_entries.ConfigEntry,
     ) -> CtcOptionsFlow:
         return CtcOptionsFlow(entry)
+
+
+async def _async_version(hass) -> str:
+    """The integration's own version, which stamps the stored menu."""
+    from homeassistant.loader import async_get_integration
+
+    return str((await async_get_integration(hass, DOMAIN)).version)
 
 
 def _slow_schema(
@@ -366,10 +386,19 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 from .stats import async_forget_install
 
                 await async_forget_install(self.hass, self._entry, DOMAIN)
+            menu = pages_from_storage(self._entry.options.get(CONF_MENU))
+            chosen = {int(page) for page in user_input.get(CONF_SLOW_PAGES, [])}
+            pages = (
+                {CONF_SLOW_PAGES: pages_to_storage([p for p in menu if p.page in chosen])}
+                if menu
+                else {}
+            )
             return self.async_create_entry(
                 title="",
                 data={
                     **self._entry.options,
+                    **pages,
+                    CONF_VISIT_SYSTEM_INFO: bool(user_input.get(CONF_VISIT_SYSTEM_INFO, True)),
                     CONF_FAST_INTERVAL: int(user_input[CONF_FAST_INTERVAL]),
                     CONF_SLOW_INTERVAL: int(user_input[CONF_SLOW_INTERVAL]),
                     CONF_RESTORE_PAGE: user_input[CONF_RESTORE_PAGE],
@@ -379,8 +408,30 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
             )
 
         options = self._entry.options
+        menu = pages_from_storage(options.get(CONF_MENU))
+        selected = [page.page for page in pages_from_storage(options.get(CONF_SLOW_PAGES))]
+        pages_field: dict[Any, Any] = {}
+        if menu:
+            # The whole menu is kept, so a page can be switched on or off here
+            # without walking the panel through its menus again.
+            pages_field[
+                vol.Optional(CONF_SLOW_PAGES, default=[str(page) for page in selected])
+            ] = selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=[
+                        selector.SelectOptionDict(
+                            value=str(page.page),
+                            label=f"{page.title} ({len(page.values)} värden)",
+                        )
+                        for page in menu
+                    ],
+                    multiple=True,
+                    mode=selector.SelectSelectorMode.LIST,
+                )
+            )
         schema = vol.Schema(
             {
+                **pages_field,
                 vol.Optional(
                     CONF_FAST_INTERVAL,
                     default=options.get(CONF_FAST_INTERVAL, DEFAULT_FAST_INTERVAL),
@@ -408,6 +459,10 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                     default=options.get(CONF_ENABLE_CONTROL, False),
                 ): bool,
                 vol.Optional(
+                    CONF_VISIT_SYSTEM_INFO,
+                    default=options.get(CONF_VISIT_SYSTEM_INFO, True),
+                ): bool,
+                vol.Optional(
                     CONF_SEND_STATISTICS,
                     default=options.get(CONF_SEND_STATISTICS, True),
                 ): bool,
@@ -431,6 +486,8 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 data={
                     **self._entry.options,
                     CONF_SLOW_PAGES: pages_to_storage(keep),
+                    CONF_MENU: pages_to_storage(self._pages),
+                    CONF_MENU_VERSION: await _async_version(self.hass),
                     CONF_SLOW_INTERVAL: int(
                         user_input.get(CONF_SLOW_INTERVAL, DEFAULT_SLOW_INTERVAL)
                     ),

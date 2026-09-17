@@ -4,7 +4,10 @@ None of this comes from Modbus. The display knows it and writes it into two of
 its own screens, and unlike the readings, these values are static: they are
 written once and stay put, so they can be read whatever page the panel happens
 to be showing. That matters, because it means the identity can be read without
-walking the panel through its menus.
+walking the panel through its menus, but also that a screen nobody has opened
+holds nothing: the display fills the buffer while the screen is shown. Where the
+system information page has never been visited, :func:`async_read_identity_via_panel`
+walks the panel there once, under guard, and reads it while it is up.
 
 Screen numbering differs between models, so the screens are located by
 fingerprint rather than by number:
@@ -23,9 +26,10 @@ from __future__ import annotations
 
 import logging
 from dataclasses import asdict, dataclass
-from typing import Any
+from typing import Any, Awaitable, Callable
 
-from .web_api import CtcWebClient, CtcWebError, Widget
+from .const import NAV_ALLOWED_EN, SYSTEM_INFO_LABEL_EN
+from .web_api import CtcWebClient, CtcWebError, Widget, tap_target
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -241,4 +245,131 @@ async def async_read_identity(client: CtcWebClient) -> Identity:
 
     if identity.is_empty:
         _LOGGER.debug("Could not read any identity from the display")
+    return identity
+
+
+# --------------------------------------------------------- the guarded walk
+
+
+async def _async_controls(
+    client: CtcWebClient, page: int
+) -> list[tuple[str, list[int], tuple[int, int]]]:
+    """The controls on ``page`` that the walk is allowed to press.
+
+    Everything is matched on the English label, which is the same across models,
+    and anything not named in the allow list is not even considered.
+    """
+    page_map = await client.async_screen_map()
+    screens = page_map.get(page, [])
+    found: list[tuple[str, list[int], tuple[int, int]]] = []
+    for screen in screens:
+        try:
+            widgets = await client.async_widgets(screen)
+        except CtcWebError:
+            continue
+        for widget in widgets:
+            if not widget.visible or not widget.label or widget.width <= 0:
+                continue
+            english = await _async_english(client, screen, widget)
+            if english in NAV_ALLOWED_EN:
+                found.append((english, screens, tap_target(widgets, widget)))
+    order = {label: n for n, label in enumerate(NAV_ALLOWED_EN)}
+    # The page we are after is tried before anything is opened.
+    found.sort(key=lambda c: (c[0] != SYSTEM_INFO_LABEL_EN, order.get(c[0], 99)))
+    return found
+
+
+async def _async_descend(
+    client: CtcWebClient, page: int, depth: int, visited: set[int]
+) -> bool:
+    """Look for the system information page from ``page``, one tap at a time.
+
+    Every tap is followed by a check of where the panel actually went. A tap
+    that changes nothing is treated as a surprise rather than as something to
+    try again: it may have opened a dialog, and the menu next door holds a
+    function test, a compressor quick start, reinstallation and a firmware
+    update. The walk then stops and the caller puts the panel back.
+    """
+    if depth <= 0 or page in visited:
+        return False
+    visited.add(page)
+    page_map = await client.async_screen_map()
+    for english, screens, (x, y) in await _async_controls(client, page):
+        if await client.async_current_page() != page:
+            return False  # somebody else is using the panel
+        await client.async_click(screens, x, y)
+        landed = await client.async_current_page()
+        if landed == page:
+            _LOGGER.debug("Tapping %s on page %s changed nothing; stopping", english, page)
+            return False
+        if english == SYSTEM_INFO_LABEL_EN:
+            return True
+        if await _async_descend(client, landed, depth - 1, visited):
+            return True
+        await client.async_click(page_map.get(landed, []), 440, 23)
+        if await client.async_current_page() != page:
+            _LOGGER.debug("Stepping back from page %s did not return to %s", landed, page)
+            return False
+    return False
+
+
+async def _async_put_back(client: CtcWebClient, origin: int) -> None:
+    """Leave the panel where it was, or at least at home."""
+    try:
+        if await client.async_current_page() == origin:
+            return
+        if await client.async_goto_page(origin):
+            return
+        await client.async_goto_home()
+    except CtcWebError as err:
+        _LOGGER.debug("Could not put the panel back on page %s: %s", origin, err)
+
+
+async def async_read_identity_via_panel(
+    client: CtcWebClient,
+    depth: int = 3,
+    restore: "Callable[[int], Awaitable[Any]] | None" = None,
+) -> Identity:
+    """Walk the panel to the system information page, read it, and go back.
+
+    Only used when the identity is still incomplete, since the values never
+    change once they have been read. Returns whatever was found, which is
+    nothing at all if the page could not be reached safely.
+
+    Stepping back only climbs the menu the walk came down, so a page on another
+    branch is out of reach that way and the panel is left at home instead. The
+    harvester knows the recorded routes, so it can put the panel back properly:
+    pass its restore as ``restore``.
+    """
+    identity = Identity()
+    try:
+        origin = await client.async_current_page()
+    except CtcWebError as err:
+        _LOGGER.debug("Could not read the panel's page: %s", err)
+        return identity
+    try:
+        home = await client.async_goto_home()
+        if home is None:
+            _LOGGER.debug("Could not find the home screen; the panel is left alone")
+            return identity
+        if not await _async_descend(client, home, depth, set()):
+            return identity
+        page = await client.async_current_page()
+        for screen in (await client.async_screen_map()).get(page, []):
+            try:
+                if await _async_read_system_screen(client, screen, identity):
+                    break
+            except CtcWebError as err:
+                _LOGGER.debug("System screen %s unreadable: %s", screen, err)
+    except CtcWebError as err:
+        _LOGGER.debug("The walk to system information stopped: %s", err)
+    finally:
+        if restore is not None:
+            try:
+                await restore(origin)
+            except Exception as err:  # noqa: BLE001 - the panel matters more
+                _LOGGER.debug("Restoring page %s failed: %s", origin, err)
+                await _async_put_back(client, origin)
+        else:
+            await _async_put_back(client, origin)
     return identity

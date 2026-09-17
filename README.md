@@ -43,7 +43,12 @@ there, which moves the physical panel in your plant room.
 
 So the display is treated as a supplement, not the base:
 
-- You choose which pages are worth the trip during setup.
+- Every page is ticked to begin with, and you choose which ones are worth the
+  trip. The whole menu is kept, so a page can be switched on or off later under
+  Configure without walking the panel again.
+- A new version of the integration reads the menu again by itself, once, in the
+  background: a newer parser understands rows and pages the older one passed
+  over, and those are then read without anyone having to ask for it.
 - They are polled on a slow interval, thirty minutes by default.
 - The panel is put back where it was afterwards.
 - If the panel is not where the integration left it, somebody is standing at it,
@@ -63,8 +68,21 @@ every form of them, on both models tested.
    the sweep finds nothing, type the address instead.
 3. Tick the display pages you want harvested. The menu is read from the unit
    itself, so the list matches your model and your installed options, in your
-   own language. For the coefficient of performance, tick the page with the
-   stored or historical operation data.
+   own language. Everything is ticked to begin with; switch off what you do not
+   want. For the coefficient of performance, keep the page with the stored or
+   historical operation data.
+
+The serial number and the display's own software version are only written into
+the System information page while that page is shown on the panel. The
+integration walks there once to read them, and puts the panel back. It presses
+nothing but Advanced, Service, Display and System information, matched on the
+English label so it works whatever language the panel is set to, checks where
+the panel went after every press, and gives up at the first surprise. Switch it
+off under Configure if you would rather open that page yourself.
+
+When something is left for you to do, it is said in Home Assistant's repairs
+view rather than only in the log: the page the coefficient of performance needs
+is not harvested, or the serial number has not been read yet.
 
 Control entities are off by default. Turn them on under the integration's
 options if you want them.

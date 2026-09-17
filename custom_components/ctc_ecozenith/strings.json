@@ -51,11 +51,14 @@
           "restore_page": "Put the panel back afterwards",
           "enable_control": "Allow controlling the heat pump",
           "send_statistics": "Send anonymous usage statistics",
-          "rescan": "Read the display's menu again"
+          "rescan": "Read the display's menu again",
+          "slow_pages": "Pages to read",
+          "visit_system_info": "Let the integration open System information on the panel"
         },
         "data_description": {
           "enable_control": "Creates control entities that write to CTC's volatile 1000 registers. The controller forgets them about five minutes after the last write, so control releases itself if Home Assistant stops. The stored settings in the 61500 block are never written.",
-          "send_statistics": "One report per day to {endpoint}: integration version, Home Assistant version and installation type, the country you configured in Home Assistant, an approximate position rounded to about 11 km, the number of entities, which transports are in use, whether control is enabled, how many display pages are harvested and whether the counters behind the coefficient of performance were found there or in Modbus, the number of failed register reads, the indoor and outdoor unit's model, the firmware in the display, the heat pump's control board and the control unit, the product and the year and week of manufacture from the serial number, and the coefficient of performance (COP) over the last day, a rolling year and the lifetime. Never a name, an address, an exact position, a full serial number, an entity name or any single reading from the house (the COP is a ratio over a day, a year or the lifetime), never anything finer than one day, and your IP address is not stored. Switching this off also erases what has already been sent. The full list: {privacy_url} It also sends a hash that links the beolink plugins running on the same Home Assistant, how many warnings and errors the integration logged since the previous report, and whether it is running or waiting to start again, never the messages themselves or the reason."
+          "send_statistics": "One report per day to {endpoint}: integration version, Home Assistant version and installation type, the country you configured in Home Assistant, an approximate position rounded to about 11 km, the number of entities, which transports are in use, whether control is enabled, how many display pages are harvested and whether the counters behind the coefficient of performance were found there or in Modbus, the number of failed register reads, the indoor and outdoor unit's model, the firmware in the display, the heat pump's control board and the control unit, the product and the year and week of manufacture from the serial number, and the coefficient of performance (COP) over the last day, a rolling year and the lifetime. Never a name, an address, an exact position, a full serial number, an entity name or any single reading from the house (the COP is a ratio over a day, a year or the lifetime), never anything finer than one day, and your IP address is not stored. Switching this off also erases what has already been sent. The full list: {privacy_url} It also sends a hash that links the beolink plugins running on the same Home Assistant, how many warnings and errors the integration logged since the previous report, and whether it is running or waiting to start again, never the messages themselves or the reason.",
+          "visit_system_info": "The panel walks to the display's System information page once and back, to read the serial number and the display's own software version. It presses nothing but Advanced, Service, Display and System information, checks where the panel went after every press, and gives up at the first surprise."
         }
       },
       "rescan": {
@@ -67,6 +70,16 @@
           "restore_page": "Put the panel back afterwards"
         }
       }
+    }
+  },
+  "issues": {
+    "history_page_missing": {
+      "title": "The coefficient of performance is missing its history page",
+      "description": "The coefficient of performance is worked out from the display's counter for delivered heat, which lives on the page with the stored or historical operation data. That page is not being read. Tick it under Settings, Devices and services, CTC EcoZenith, Configure."
+    },
+    "identity_incomplete": {
+      "title": "The serial number has not been read",
+      "description": "The display writes the serial number and its own software version into the System information page only once that page has been shown on the panel. Open it once on the panel, or let the integration walk there itself under Configure."
     }
   }
 }

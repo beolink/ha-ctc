@@ -264,6 +264,10 @@ class CtcWebClient:
         self._port = port
         self._language = language
         self._semaphore = asyncio.Semaphore(WEB_MAX_CONCURRENCY)
+        #: Held while the panel is being walked. The harvester and the walk to
+        #: the system information page both move the physical display, and two
+        #: of them at once would leave it somewhere neither expects.
+        self.panel = asyncio.Lock()
         self._screen_cache: dict[int, ScreenDef] = {}
         self._text_cache: dict[int, str] = {}
         self._screen_map: dict[int, list[int]] | None = None

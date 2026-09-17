@@ -51,11 +51,14 @@
           "restore_page": "Ställ tillbaka panelen efteråt",
           "enable_control": "Tillåt styrning av värmepumpen",
           "send_statistics": "Skicka anonym användningsstatistik",
-          "rescan": "Läs om displayens meny"
+          "rescan": "Läs om displayens meny",
+          "slow_pages": "Sidor att hämta",
+          "visit_system_info": "Låt integrationen öppna Systeminformation på panelen"
         },
         "data_description": {
           "enable_control": "Skapar styrentiteter som skriver till CTC:s flyktiga 1000-register. De nollställs av pumpen cirka fem minuter efter sista skrivningen, så styrningen släpper av sig själv om Home Assistant stannar. De lagrade inställningarna i 61500-serien rörs aldrig.",
-          "send_statistics": "En rapport per dygn till {endpoint}: integrationens version, Home Assistant-version och installationstyp, landet du ställt in i Home Assistant, en ungefärlig plats avrundad till cirka 11 km, antal entiteter, vilka transporter som används, om styrning är påslagen, hur många displaysidor som hämtas och om räknarna bakom värmefaktorn hittades där eller i Modbus, antal misslyckade registeravläsningar, inne- och utedelens modell, programversionen i displayen, värmepumpens styrkort och styrenheten, produkt samt tillverkningsår och -vecka ur serienumret, och värmefaktorn (COP) för senaste dygnet, rullande år och hela livslängden. Aldrig namn, adress, exakt position, fullständigt serienummer, entitetsnamn eller någon enskild avläsning från huset (värmefaktorn är en kvot över ett dygn, ett år eller hela livslängden), aldrig något finare än ett dygn, och din IP-adress sparas inte. Stänger du av den raderas också det som redan skickats. Hela listan: {privacy_url} Dessutom skickas en hash som knyter ihop beolinks plugin på samma Home Assistant, hur många varningar och fel integrationen loggat sedan förra rapporten, och om den är igång eller väntar på att starta igen, aldrig själva meddelandena eller skälet."
+          "send_statistics": "En rapport per dygn till {endpoint}: integrationens version, Home Assistant-version och installationstyp, landet du ställt in i Home Assistant, en ungefärlig plats avrundad till cirka 11 km, antal entiteter, vilka transporter som används, om styrning är påslagen, hur många displaysidor som hämtas och om räknarna bakom värmefaktorn hittades där eller i Modbus, antal misslyckade registeravläsningar, inne- och utedelens modell, programversionen i displayen, värmepumpens styrkort och styrenheten, produkt samt tillverkningsår och -vecka ur serienumret, och värmefaktorn (COP) för senaste dygnet, rullande år och hela livslängden. Aldrig namn, adress, exakt position, fullständigt serienummer, entitetsnamn eller någon enskild avläsning från huset (värmefaktorn är en kvot över ett dygn, ett år eller hela livslängden), aldrig något finare än ett dygn, och din IP-adress sparas inte. Stänger du av den raderas också det som redan skickats. Hela listan: {privacy_url} Dessutom skickas en hash som knyter ihop beolinks plugin på samma Home Assistant, hur många varningar och fel integrationen loggat sedan förra rapporten, och om den är igång eller väntar på att starta igen, aldrig själva meddelandena eller skälet.",
+          "visit_system_info": "Panelen går till displayens sida Systeminformation en gång och tillbaka igen, för att läsa serienummer och displayens egen programversion. Den trycker bara på Avancerat, Service, Display och Systeminformation, kontrollerar var panelen hamnade efter varje tryck och avbryter vid minsta avvikelse."
         }
       },
       "rescan": {
@@ -67,6 +70,16 @@
           "restore_page": "Ställ tillbaka panelen efteråt"
         }
       }
+    }
+  },
+  "issues": {
+    "history_page_missing": {
+      "title": "Värmefaktorn saknar historiksidan",
+      "description": "Värmefaktorn räknas ur displayens räknare för avgiven värme, som står på sidan med historisk eller lagrad driftinfo. Den sidan hämtas inte. Kryssa i den under Inställningar, Enheter och tjänster, CTC EcoZenith, Konfigurera."
+    },
+    "identity_incomplete": {
+      "title": "Serienumret har inte lästs",
+      "description": "Displayen skriver serienummer och sin egen programversion i sidan Systeminformation först när den sidan visats på panelen. Öppna den en gång på panelen, eller låt integrationen gå dit själv under Konfigurera."
     }
   }
 }
