@@ -46,6 +46,10 @@ from .const import WEB_MAX_CONCURRENCY
 _LOGGER = logging.getLogger(__name__)
 
 REQUEST_TIMEOUT = aiohttp.ClientTimeout(total=10)
+#: A second chance for a reading that was merely slow. The display is a small
+#: embedded server and sometimes takes its time; a tap, on the other hand, is
+#: never repeated, because a tap that did land would move the panel twice.
+PATIENT_TIMEOUT = aiohttp.ClientTimeout(total=25)
 
 
 class CtcWebError(Exception):
@@ -277,24 +281,35 @@ class CtcWebClient:
         return f"http://{self._host}:{self._port}"
 
     async def _request(self, path: str, body: str | None = None) -> str:
-        """Perform one request, decompressing when the server gzips regardless."""
+        """Perform one request, decompressing when the server gzips regardless.
+
+        A reading that was slow or dropped is asked for once more, with longer
+        patience. A tap is asked for only once: a tap that landed and then
+        looked like a failure would move the panel a second time.
+        """
         url = f"{self.base_url}{path}"
+        timeouts = (REQUEST_TIMEOUT, PATIENT_TIMEOUT) if body is None else (REQUEST_TIMEOUT,)
         async with self._semaphore:
-            try:
-                if body is None:
-                    response = await self._session.get(url, timeout=REQUEST_TIMEOUT)
-                else:
-                    response = await self._session.post(
-                        url, data=body.encode(), timeout=REQUEST_TIMEOUT
-                    )
-                async with response:
-                    if response.status != 200:
-                        raise CtcWebError(f"{path} answered HTTP {response.status}")
-                    raw = await response.read()
-            except aiohttp.ClientError as err:
-                raise CtcWebError(f"{path} failed: {err}") from err
-            except asyncio.TimeoutError as err:
-                raise CtcWebError(f"{path} timed out") from err
+            for attempt, timeout in enumerate(timeouts, start=1):
+                try:
+                    if body is None:
+                        response = await self._session.get(url, timeout=timeout)
+                    else:
+                        response = await self._session.post(
+                            url, data=body.encode(), timeout=timeout
+                        )
+                    async with response:
+                        if response.status != 200:
+                            raise CtcWebError(f"{path} answered HTTP {response.status}")
+                        raw = await response.read()
+                    break
+                except (aiohttp.ClientError, asyncio.TimeoutError) as err:
+                    if attempt < len(timeouts):
+                        _LOGGER.debug("%s was slow, asking once more: %s", path, err)
+                        continue
+                    if isinstance(err, asyncio.TimeoutError):
+                        raise CtcWebError(f"{path} timed out") from err
+                    raise CtcWebError(f"{path} failed: {err}") from err
         if raw[:2] == b"\x1f\x8b":
             raw = gzip.decompress(raw)
         return raw.decode("utf-8", "replace").lstrip("﻿")

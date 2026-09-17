@@ -96,6 +96,10 @@ SENTINELS: Final = frozenset({9999, -9999, 10000, -10000, 32767, -32768, 4294967
 
 # The display's web server drops connections above roughly five in flight.
 WEB_MAX_CONCURRENCY: Final = 3
+#: How often to try again while the display is not answering, and how many
+#: harvests in a row may fail before its readings are called unavailable.
+RETRY_INTERVAL: Final = 300
+HARVEST_PATIENCE: Final = 3
 
 PLATFORMS: Final = ["sensor", "binary_sensor", "number", "select", "button"]
 

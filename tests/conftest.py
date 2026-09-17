@@ -94,6 +94,11 @@ def updates():
 
 
 @pytest.fixture(scope="session")
+def patience():
+    return load("patience")
+
+
+@pytest.fixture(scope="session")
 def dashboard_views():
     return load("dashboard_views")
 

@@ -184,6 +184,11 @@ frequent writing can destroy the controller.
   it answers, so the first poll after a reconnect is delayed deliberately.
 - **The web server drops connections above roughly five in flight.** The client
   keeps three.
+- **A slow answer costs one reading, not all of them.** A reading that times out
+  is asked for once more, with longer patience; a tap never is, since a tap that
+  did land would move the panel twice. A harvest that fails keeps the readings it
+  already had and tries again in five minutes instead of thirty. Only after three
+  failed harvests in a row are the display's readings called unavailable.
 - **Absent hardware still answers.** The controller replies for ten heat pumps
   and four heating systems whatever is actually installed, with plausible
   numbers. Readings marked as missing use CTC's own markers, plus or minus 9999

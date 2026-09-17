@@ -20,6 +20,8 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 
 from .catalogue import numeric_value
 from .const import (
+    HARVEST_PATIENCE,
+    RETRY_INTERVAL,
     CONTROL_KEEPALIVE_SECONDS,
     DOMAIN,
     MODBUS_SENSORS,
@@ -27,6 +29,7 @@ from .const import (
     ModbusSensor,
     SlowPage,
 )
+from .patience import Patience
 from .modbus_api import (
     CtcModbusClient,
     CtcModbusError,
@@ -139,12 +142,26 @@ class CtcWebCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         #: a value through a skipped cycle, so this is the only way to tell a
         #: fresh reading from a carried one.
         self.read_at: dict[str, datetime] = {}
+        #: A display that is merely slow should not take every reading with it.
+        self.patience = Patience(interval, RETRY_INTERVAL, HARVEST_PATIENCE)
 
     async def _async_update_data(self) -> dict[str, Any]:
         if not self.pages:
             return {}
         async with self.client.panel:
-            return await self._async_harvest()
+            try:
+                data = await self._async_harvest()
+            except UpdateFailed as err:
+                shown = self.patience.failed(bool(self.data))
+                self.update_interval = timedelta(seconds=self.patience.seconds)
+                if shown:
+                    raise
+                _LOGGER.debug("Display harvest failed (%s), keeping what we have: %s",
+                              self.patience.failures, err)
+                return dict(self.data or {})
+        self.patience.worked()
+        self.update_interval = timedelta(seconds=self.patience.seconds)
+        return data
 
     async def _async_harvest(self) -> dict[str, Any]:
         data: dict[str, Any] = dict(self.data or {})
