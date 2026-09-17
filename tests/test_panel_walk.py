@@ -19,9 +19,10 @@ def run(coro):
 class FakePanel:
     """A display with a menu tree, counting every tap it is given."""
 
-    def __init__(self, web_api, tree, values=None, start=1, swallow=None):
+    def __init__(self, web_api, tree, values=None, start=1, swallow=None, icons=None):
         self.web_api = web_api
         self.tree = tree            # page -> [(english, swedish, target page)]
+        self.icons = icons or {}    # page -> [(english as an icon resolves it, ...)]
         self.values = values or {}  # page -> list of (label, english, text)
         self.page = start
         self.parent = {t: p for p, items in tree.items() for _e, _s, t in items}
@@ -38,6 +39,11 @@ class FakePanel:
     async def async_widgets(self, screen):
         page = screen // 10
         out = []
+        for n, (english, _swedish, _target) in enumerate(self.icons.get(page, [])):
+            # An icon: its own label resolves to whatever the panel happens to
+            # keep in that slot, so it may read like a menu item it is not.
+            out.append(self.web_api.Widget(index=300 + n, kind=1, x=415, y=4,
+                                           width=50, height=30, visible=True, label=english))
         for n, (_english, swedish, _target) in enumerate(self.tree.get(page, [])):
             out.append(self.web_api.Widget(index=n, kind=2, x=10 + n * 100, y=100,
                                            width=80, height=20, visible=True, label=swedish))
@@ -50,6 +56,10 @@ class FakePanel:
 
     async def async_english_label(self, screen, widget):
         page = screen // 10
+        if widget.index >= 300:
+            items = self.icons.get(page, [])
+            n = widget.index - 300
+            return items[n][0] if n < len(items) else None
         if widget.index < 100:
             items = self.tree.get(page, [])
             return items[widget.index][0] if widget.index < len(items) else None
@@ -173,3 +183,98 @@ def test_the_walk_does_not_go_deeper_than_it_may(identity, web_api):
     panel = FakePanel(web_api, deep, {60: SYSTEM_ROWS}, start=1)
     found = run(identity.async_read_identity_via_panel(panel, depth=2))
     assert found.is_empty
+
+
+#: An i550 Pro keeps the page in the quick menu, behind the panel's own button.
+QUICK = {
+    1: [("Operation data", "Driftinfo", 20)],
+    488: [("System information", "Systeminformation", 60)],
+}
+
+
+class QuickPanel(FakePanel):
+    """A panel whose home screen opens a quick menu with its own button."""
+
+    async def async_click(self, screens, x, y):
+        if (x, y) == (440, 23) and self.page == 1:
+            self.taps.append((1, "menu button"))
+            self.page = 488
+            return []
+        if (x, y) == (440, 23) and self.page == 488:
+            self.taps.append((488, "back"))
+            self.page = 1
+            return []
+        return await super().async_click(screens, x, y)
+
+
+def test_the_page_behind_the_quick_menu_is_found(identity, web_api):
+    panel = QuickPanel(web_api, QUICK, {60: SYSTEM_ROWS}, start=1)
+    found = run(identity.async_read_identity_via_panel(panel))
+    assert found.serial == "720825408489"
+    assert panel.pressed.count("menu button") == 1
+
+
+def test_an_empty_quick_menu_is_stepped_out_of(identity, web_api):
+    panel = QuickPanel(web_api, {1: [("Operation data", "Driftinfo", 20)], 488: []}, start=1)
+    found = run(identity.async_read_identity_via_panel(panel))
+    assert found.is_empty
+    assert panel.page == 1
+
+
+def test_an_icon_that_reads_like_the_page_is_never_trusted(identity, web_api):
+    """The real trap, met on an i550 Pro: an icon on the installer page resolves
+    to "System information" and sits on the back button. Trusting it sent the
+    walk back out of the menu believing it had arrived."""
+    tree = {
+        1: [("Operation data", "Driftinfo", 20), ("Advanced", "Avancerat", 61)],
+        61: [("Display", "Display", 40), ("Service", "Service", 50)],
+        40: [("System information", "Systeminformation", 60)],
+        50: [("Function test", "Funktionstest", 70)],
+    }
+    panel = FakePanel(web_api, tree, {60: SYSTEM_ROWS}, start=1,
+                      icons={61: [("System information", "Systeminformation", 0)]})
+    found = run(identity.async_read_identity_via_panel(panel))
+    assert found.serial == "720825408489"
+    assert "Function test" not in panel.pressed
+
+
+def test_the_service_menu_is_left_for_last(identity, web_api):
+    # Where the page is somewhere else, the service menu is never opened.
+    tree = {
+        1: [("Advanced", "Avancerat", 61)],
+        61: [("Service", "Service", 50), ("Display", "Display", 40)],
+        40: [("System information", "Systeminformation", 60)],
+        50: [("Function test", "Funktionstest", 70)],
+    }
+    panel = FakePanel(web_api, tree, {60: SYSTEM_ROWS}, start=1)
+    found = run(identity.async_read_identity_via_panel(panel))
+    assert found.serial == "720825408489"
+    assert "Service" not in panel.pressed
+
+
+def test_the_pages_own_heading_is_not_a_control(identity, web_api):
+    # The installer page is titled "Avancerat", which is "Installer" in English.
+    # Pressing a heading does nothing, and a press that does nothing stops the
+    # walk, so the heading has to be skipped rather than tried.
+    class Headed(FakePanel):
+        async def async_widgets(self, screen):
+            out = await super().async_widgets(screen)
+            if screen // 10 == 61:
+                out.insert(0, self.web_api.Widget(index=400, kind=3, x=50, y=4,
+                                                  width=300, height=20, visible=True,
+                                                  label="Avancerat"))
+            return out
+
+        async def async_english_label(self, screen, widget):
+            if widget.index == 400:
+                return "Installer"
+            return await super().async_english_label(screen, widget)
+
+    tree = {
+        1: [("Advanced", "Avancerat", 61)],
+        61: [("Display", "Display", 40)],
+        40: [("System information", "Systeminformation", 60)],
+    }
+    panel = Headed(web_api, tree, {60: SYSTEM_ROWS}, start=1)
+    found = run(identity.async_read_identity_via_panel(panel))
+    assert found.serial == "720825408489"

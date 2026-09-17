@@ -69,7 +69,20 @@ OPERATION_DATA_LABEL_EN: Final = "Operation data"
 # quick start, reinstallation and a firmware update, and the panel is shared
 # with whoever is standing at it, so anything unnamed is left alone.
 SYSTEM_INFO_LABEL_EN: Final = "System information"
-NAV_ALLOWED_EN: Final = ("Advanced", "Service", "Display", "System information")
+# Display before Service, so the service menu is only opened where the page is
+# not anywhere else. "Installer" is what the panel calls Avancerat in English.
+NAV_ALLOWED_EN: Final = (
+    "Advanced",
+    "Installer",
+    "Display",
+    "Display setup",
+    "Service",
+    "System information",
+)
+#: A caption this high up is the page's own heading, not a control: the
+#: installer page is titled "Avancerat", which is "Installer" in English, and
+#: pressing a heading does nothing at all. Same rule as the catalogue's.
+PAGE_HEADER_HEIGHT: Final = 45
 
 #: What makes a display row a period rather than a lifetime total: "Avgiven
 #: värme/30 dagar" and "Avgiven energi/24h" sit right beside the totals on the
