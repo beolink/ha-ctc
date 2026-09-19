@@ -60,6 +60,7 @@ from .const import (
     LANG_SWEDISH,
     PLATFORMS,
     SlowPage,
+    web_interface_url,
 )
 from .coordinator import CtcControlManager, CtcModbusCoordinator, CtcWebCoordinator
 from .identity import Identity, async_read_identity, async_read_identity_via_panel
@@ -400,7 +401,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CtcConfigEntry) -> bool:
         serial_number=identity.serial,
         sw_version=identity.display_firmware,
         hw_version=identity.bootloader,
-        configuration_url=f"http://{host}:{web_port}/main.html",
+        configuration_url=web_interface_url(host, web_port),
     )
 
     runtime = CtcRuntime(

@@ -36,7 +36,15 @@ from homeassistant.helpers.json import json_bytes, json_fragment
 
 from . import dashboard_views as views
 from .card import async_register_card
-from .const import CONF_LANGUAGE, DOMAIN, LANG_SWEDISH
+from .const import (
+    CONF_LANGUAGE,
+    CONF_WEB_PORT,
+    CONF_WEB_TAB,
+    DEFAULT_WEB_PORT,
+    DOMAIN,
+    LANG_SWEDISH,
+    web_interface_url,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -102,6 +110,13 @@ def _collect(hass: HomeAssistant) -> list[dict[str, Any]]:
             "energy_in": getattr(runtime.energy_in, "key", None),
             "unused": sorted(unused),
             "control_enabled": bool(runtime.control_enabled),
+            # The display's own web interface, as a tab of its own, only
+            # where it was asked for: the panel answers it from the same
+            # small web server the integration harvests from.
+            "web_url": (
+                web_interface_url(host, int(entry.data.get(CONF_WEB_PORT, DEFAULT_WEB_PORT)))
+                if entry.options.get(CONF_WEB_TAB, False) else None
+            ),
             "display_interval": (
                 int(runtime.web.update_interval.total_seconds())
                 if runtime.web is not None and runtime.web.update_interval else None

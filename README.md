@@ -106,6 +106,12 @@ so it is never out of date.
   the right.
 - **Display values.** One section per harvested display page, each row under
   the name the panel itself prints.
+- **Web interface**, the display's own page as the rightmost tab, off unless you
+  ask for it under *Configure*. The tab keeps asking the display's own web
+  server for as long as it is open, and that is the same small server the
+  integration harvests its slow values from, so leaving it open can delay what
+  the integration reads. A Home Assistant reached over https cannot show a
+  display that answers over http, and says so in place of the page.
 
 **Every value is explained.** Hover over a name to read what the value is, or
 tap it and the explanation is written out underneath, with where the value

@@ -13,6 +13,7 @@ entities up every time the page is opened and hands this module one dict per pum
      "energy_in": key | None,           # by cop.find_energy_totals
      "unused": [key],                   # readings this installation only ever gave as 0
      "control_enabled": bool,
+     "web_url": str | None,             # the display's web interface, when asked for
      "display_interval": int | None,    # seconds between display harvests
      "language": "sv" | "en"}
 
@@ -149,6 +150,7 @@ TEXT = {
         "settings": "Pumpens inställningar",
         "unit": "Om enheten",
         "other": "Övrigt",
+        "web": "Webbgränssnitt",
         "control_off": (
             "Styrning är avstängd. Slå på **Tillåt styrning av värmepumpen** i "
             "[integrationens inställningar](/config/integrations/integration/ctc_ecozenith), "
@@ -172,6 +174,7 @@ TEXT = {
         "settings": "Settings in the heat pump",
         "unit": "About the unit",
         "other": "Other",
+        "web": "Web interface",
         "control_off": (
             "Control is switched off. Turn on **Allow controlling the heat pump** in "
             "[the integration's settings](/config/integrations/integration/ctc_ecozenith) "
@@ -474,6 +477,28 @@ def display_sections(
     return sections
 
 
+def web_view(
+    pump: Mapping[str, Any], text: Mapping[str, str], suffix: str = ""
+) -> dict[str, Any] | None:
+    """The display's own web interface in a tab, where it was asked for.
+
+    The same page the panel shows, served by the panel itself, so it is the
+    whole tab and nothing else. Home Assistant reached over https cannot show a
+    display that answers over http, and says so in place of the page.
+    """
+    url = pump.get("web_url")
+    if not url:
+        return None
+    name = str(pump.get("name") or TITLE)
+    return {
+        "title": f"{name}: {text['web'].lower()}" if suffix else text["web"],
+        "path": f"web{suffix}",
+        "icon": "mdi:monitor-dashboard",
+        "type": "panel",
+        "cards": [{"type": "iframe", "url": str(url)}],
+    }
+
+
 def _sort(pumps: Iterable[Any]) -> list[Mapping[str, Any]]:
     wanted = [p for p in pumps or [] if isinstance(p, Mapping)]
     return sorted(wanted, key=lambda p: str(p.get("name") or "").casefold())
@@ -493,6 +518,7 @@ def build_dashboard(
 
     several = len(pumps) > 1
     views: list[dict[str, Any]] = []
+    last: list[dict[str, Any]] = []
     for index, pump in enumerate(pumps, start=1):
         name = str(pump.get("name") or TITLE)
         suffix = f"-{index}" if several else ""
@@ -513,7 +539,12 @@ def build_dashboard(
                 "max_columns": 4,
                 "sections": display,
             })
-    return {"title": TITLE, "views": views}
+        web = web_view(pump, text, suffix)
+        if web:
+            # Last of all, so the panel's own interface is the rightmost tab
+            # however many pumps and pages come before it.
+            last.append(web)
+    return {"title": TITLE, "views": views + last}
 
 
 def message_dashboard(message: str, lang: str | None) -> dict[str, Any]:
