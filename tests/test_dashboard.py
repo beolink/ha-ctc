@@ -448,36 +448,12 @@ def test_the_button_keeps_its_press_and_is_explained_on_hover(dashboard_views, p
     assert card["explanation"].startswith("Släpper all styrning")
 
 
-def test_the_web_interface_is_a_tab_of_its_own_only_when_asked_for(dashboard_views, pumps, const):
-    pump = pumps["vsh"]
-    assert [v["path"] for v in dashboard_views.build_dashboard([pump], "sv", NEW_HA)["views"]] == [
-        "overview", "display",
-    ]
-    pump["web_url"] = const.web_interface_url("10.0.40.55")
-    views = dashboard_views.build_dashboard([pump], "sv", NEW_HA)["views"]
-    # Last of all, so it is the rightmost tab.
-    assert [v["path"] for v in views] == ["overview", "display", "web"]
-    web = views[-1]
-    assert web["title"] == "Webbgränssnitt" and web["type"] == "panel"
-    assert web["cards"] == [{"type": "iframe", "url": "http://10.0.40.55/main.html"}]
-    # No entity of the integration's own is on it.
-    assert dashboard_views.entity_ids({"views": [web]}) == set()
-
-
-def test_the_web_tab_comes_after_every_pumps_pages_and_carries_its_name(dashboard_views, pumps, const):
-    for pump in pumps.values():
-        pump["web_url"] = const.web_interface_url("10.0.0.1", 8080)
-    views = dashboard_views.build_dashboard(list(pumps.values()), "sv", NEW_HA)["views"]
-    assert [v["path"] for v in views] == [
-        "overview-1", "display-1", "overview-2", "display-2", "web-1", "web-2",
-    ]
-    assert views[-2]["title"] == "CTC EcoZenith i255: webbgränssnitt"
-    assert views[-1]["cards"][0]["url"] == "http://10.0.0.1:8080/main.html"
-
-
 def test_the_address_of_the_web_interface(const):
-    # The display answers the same page for any main.* address, and the port is
-    # only written out when it is not the usual one.
+    """What the device's link in Home Assistant points at.
+
+    The display answers the same page for any main.* address, and the port is
+    only written out when it is not the usual one.
+    """
     assert const.web_interface_url("10.0.40.55") == "http://10.0.40.55/main.html"
     assert const.web_interface_url("10.0.40.55", 80) == "http://10.0.40.55/main.html"
     assert const.web_interface_url("10.0.40.55", 8080) == "http://10.0.40.55:8080/main.html"

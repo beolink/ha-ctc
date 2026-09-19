@@ -25,7 +25,6 @@ from .const import (
     CONF_CHECK_UPDATES,
     CONF_ENABLE_CONTROL,
     CONF_SEND_STATISTICS,
-    CONF_WEB_TAB,
     CONF_FAST_INTERVAL,
     CONF_LANGUAGE,
     CONF_MODBUS_PORT,
@@ -406,7 +405,6 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                     CONF_SLOW_INTERVAL: int(user_input[CONF_SLOW_INTERVAL]),
                     CONF_RESTORE_PAGE: user_input[CONF_RESTORE_PAGE],
                     CONF_ENABLE_CONTROL: user_input[CONF_ENABLE_CONTROL],
-                    CONF_WEB_TAB: bool(user_input.get(CONF_WEB_TAB, False)),
                     CONF_SEND_STATISTICS: now_on,
                 },
             )
@@ -461,9 +459,6 @@ class CtcOptionsFlow(config_entries.OptionsFlow):
                 vol.Optional(
                     CONF_ENABLE_CONTROL,
                     default=options.get(CONF_ENABLE_CONTROL, False),
-                ): bool,
-                vol.Optional(
-                    CONF_WEB_TAB, default=options.get(CONF_WEB_TAB, False)
                 ): bool,
                 vol.Optional(
                     CONF_VISIT_SYSTEM_INFO,

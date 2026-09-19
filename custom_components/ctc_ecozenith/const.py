@@ -20,8 +20,9 @@ DOMAIN: Final = "ctc_ecozenith"
 
 DEFAULT_MODBUS_PORT: Final = 502
 DEFAULT_WEB_PORT: Final = 80
-#: The display's own web interface. Its server answers the same page for
-#: any main.* address, on an i255 as on an i550 Pro, and 400 for a bare /.
+#: The display's own web interface, which the device's link in Home Assistant
+#: points at. Its server answers the same page for any main.* address, on an
+#: i255 as on an i550 Pro, and 400 for a bare /.
 WEB_MAIN_PAGE: Final = "main.html"
 DEFAULT_SLAVE: Final = 1
 
@@ -48,10 +49,6 @@ CONF_SLOW_INTERVAL: Final = "slow_interval"
 CONF_PARK_PAGE: Final = "park_page"
 CONF_RESTORE_PAGE: Final = "restore_page"
 CONF_ENABLE_CONTROL: Final = "enable_control"
-#: Show the display's own web interface as the page's last tab. Off by
-#: default: the panel's web server is small, and a tab left open keeps
-#: asking it for the page it is showing.
-CONF_WEB_TAB: Final = "web_tab"
 CONF_FAST_INTERVAL: Final = "fast_interval"
 # Must match OPTION_KEY in stats.py. Kept here so config_flow can build its
 # schema without importing stats.py, which pulls in Home Assistant.

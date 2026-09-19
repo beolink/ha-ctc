@@ -50,7 +50,6 @@
           "slow_interval": "Displayintervall",
           "restore_page": "Ställ tillbaka panelen efteråt",
           "enable_control": "Tillåt styrning av värmepumpen",
-          "web_tab": "Visa displayens webbgränssnitt som en flik",
           "send_statistics": "Skicka anonym användningsstatistik",
           "rescan": "Läs om displayens meny",
           "slow_pages": "Sidor att hämta",
@@ -61,8 +60,7 @@
           "enable_control": "Skapar styrentiteter som skriver till CTC:s flyktiga 1000-register. De nollställs av pumpen cirka fem minuter efter sista skrivningen, så styrningen släpper av sig själv om Home Assistant stannar. De lagrade inställningarna i 61500-serien rörs aldrig.",
           "send_statistics": "En rapport per dygn till {endpoint}: integrationens version, Home Assistant-version och installationstyp, landet du ställt in i Home Assistant, en ungefärlig plats avrundad till cirka 11 km, antal entiteter, vilka transporter som används, om styrning är påslagen, hur många displaysidor som hämtas och om räknarna bakom värmefaktorn hittades där eller i Modbus, antal misslyckade registeravläsningar, inne- och utedelens modell, programversionen i displayen, värmepumpens styrkort och styrenheten, produkt samt tillverkningsår och -vecka ur serienumret, och värmefaktorn (COP) för senaste dygnet, rullande år och hela livslängden. Aldrig namn, adress, exakt position, fullständigt serienummer, entitetsnamn eller någon enskild avläsning från huset (värmefaktorn är en kvot över ett dygn, ett år eller hela livslängden), aldrig något finare än ett dygn, och din IP-adress sparas inte. Stänger du av den raderas också det som redan skickats. Hela listan: {privacy_url} Dessutom skickas en hash som knyter ihop beolinks plugin på samma Home Assistant, hur många varningar och fel integrationen loggat sedan förra rapporten, och om den är igång eller väntar på att starta igen, aldrig själva meddelandena eller skälet.",
           "visit_system_info": "Panelen går till displayens sida Systeminformation en gång och tillbaka igen, för att läsa serienummer och displayens egen programversion. Den trycker bara på Avancerat, Service, Display och Systeminformation, kontrollerar var panelen hamnade efter varje tryck och avbryter vid minsta avvikelse.",
-          "check_updates": "Frågar GitHub en gång om dygnet om det finns en nyare release av integrationen, och säger till i reparationsvyn. Home Assistant erbjuder bara uppdateringar för det HACS installerat, så en kopia som lagts dit för hand får annars aldrig någon.",
-          "web_tab": "Visning av webbgränssnittet kan fördröja kommunikationen till Home Assistant: fliken hämtar från displayens egen webbserver så länge den är öppen, och det är samma lilla server som integrationen läser sina långsamma värden ur. Fliken ligger längst till höger på sidan CTC EcoZenith och visar panelen precis som den står. Ett Home Assistant som nås över https kan inte visa en display som svarar över http, och säger det i stället för sidan."
+          "check_updates": "Frågar GitHub en gång om dygnet om det finns en nyare release av integrationen, och säger till i reparationsvyn. Home Assistant erbjuder bara uppdateringar för det HACS installerat, så en kopia som lagts dit för hand får annars aldrig någon."
         }
       },
       "rescan": {
