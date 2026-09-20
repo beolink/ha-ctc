@@ -5,8 +5,8 @@
  * uses two cards from here:
  *
  *   custom:ctc-ecozenith-tile   Home Assistant's own tile, left as it is, with an "i"
- *                               in its corner that writes the explanation out under
- *                               the tile. Tapping the name does the same.
+ *                               right after the name that writes the explanation out
+ *                               under the tile. Tapping the name does the same.
  *   custom:ctc-ecozenith-rows   a list of values, name on the left and value on the
  *                               right, each with its own "i". A list can carry
  *                               headings, and a filter over the whole list, which is
@@ -125,15 +125,21 @@
         :host { display: block; }
         .frame { position: relative; height: var(--ctc-height, auto); }
         .explained { cursor: help; }
-        /* The corner above the value, which a tile leaves empty: its name and
-           state stand to the left of it, and a control under them. */
+        /* Right after the name, where the NIBE page puts it. The tile draws the
+           name itself, so the button is placed against the measured text, and
+           falls back to the corner the tile leaves empty. */
         .why {
           position: absolute;
           top: 2px;
           right: 2px;
           z-index: 1;
-          padding: 4px 6px;
+          padding: 2px 4px;
           font-size: 15px;
+        }
+        .why.beside {
+          top: auto;
+          right: auto;
+          transform: translateY(-50%);
         }
         ha-card.detail { margin-top: 8px; padding: 12px 16px; }
         ${DETAIL_STYLE}
@@ -148,6 +154,11 @@
       this.shadowRoot.append(style, this._frame, this._detail);
       this._frame.appendChild(this._why);
       this._frame.addEventListener("click", (event) => this._clicked(event));
+      if (window.ResizeObserver) {
+        // A narrower column moves the name, and with it the button beside it.
+        this._watch = new ResizeObserver(() => this._placeSoon());
+        this._watch.observe(this._frame);
+      }
       this.addEventListener("keydown", (event) => {
         if (event.target === this && (event.key === "Enter" || event.key === " ")) {
           event.preventDefault();
@@ -192,11 +203,14 @@
       this._why.setAttribute("aria-label", config.explain || "Explanation");
       if (explained) fillDetail(this._detail, config, { ...config, entity: config.tile.entity }, this);
       this._setOpen(this._open && explained);
+      this._placeSoon();
     }
 
     set hass(hass) {
       this._hass = hass;
       if (this._tile) this._tile.hass = hass;
+      // A new state can change the name's width, and with it where the "i" goes.
+      this._placeSoon();
     }
 
     set layout(layout) {
@@ -206,6 +220,15 @@
 
     set preview(preview) {
       if (this._tile) this._tile.preview = preview;
+    }
+
+    connectedCallback() {
+      this._placeSoon();
+    }
+
+    disconnectedCallback() {
+      if (this._pending) cancelAnimationFrame(this._pending);
+      this._pending = 0;
     }
 
     getCardSize() {
@@ -221,6 +244,56 @@
       delete options.min_rows;
       delete options.max_rows;
       return options;
+    }
+
+    /** Measure once per frame at most: a tile is laid out by Home Assistant, and
+     *  every state in the house sets hass again. */
+    _placeSoon() {
+      if (this._pending || this._why.hidden) return;
+      this._pending = requestAnimationFrame(() => {
+        this._pending = 0;
+        this._place();
+      });
+    }
+
+    /** The name's own text box, inside Home Assistant's tile. Read, never
+     *  written: the tile is left exactly as it is. */
+    _nameText() {
+      const root = this._tile && this._tile.shadowRoot;
+      const info = root && root.querySelector("ha-tile-info");
+      if (!info) return null;
+      return (
+        info.querySelector("span.primary") ||
+        info.querySelector(".primary") ||
+        (info.shadowRoot && info.shadowRoot.querySelector(".primary")) ||
+        null
+      );
+    }
+
+    _place() {
+      const name = this._nameText();
+      const frame = this._frame.getBoundingClientRect();
+      if (!name || !frame.width) return this._corner();
+      const range = document.createRange();
+      range.selectNodeContents(name);
+      const text = range.getBoundingClientRect();
+      // A name that does not fit is cut with an ellipsis, and the button then
+      // stands at the end of the room the name had.
+      const room = name.getBoundingClientRect();
+      if (!text.width || !room.width) return this._corner();
+      const right = Math.min(text.right, room.right);
+      const width = this._why.offsetWidth || 22;
+      this._why.classList.add("beside");
+      this._why.style.left = `${Math.round(
+        Math.min(right - frame.left + 2, Math.max(0, frame.width - width - 2))
+      )}px`;
+      this._why.style.top = `${Math.round(text.top - frame.top + text.height / 2)}px`;
+    }
+
+    _corner() {
+      this._why.classList.remove("beside");
+      this._why.style.left = "";
+      this._why.style.top = "";
     }
 
     _tileRows() {
@@ -309,7 +382,7 @@
           color: var(--state-icon-color);
         }
         .name {
-          flex: 1;
+          flex: 0 1 auto;
           min-width: 0;
           margin-left: 16px;
           overflow: hidden;
@@ -317,6 +390,9 @@
           white-space: nowrap;
           color: var(--primary-text-color);
         }
+        /* The "i" stands right after the name, and the value keeps the right
+           edge to itself. */
+        .gap { flex: 1 1 auto; min-width: 8px; }
         .value {
           flex: none;
           margin-left: 16px;
@@ -427,7 +503,9 @@
       if (item.explanation) {
         element.appendChild(explainButton(this._config.explain, toggle));
       }
-      element.appendChild(value);
+      const gap = document.createElement("span");
+      gap.className = "gap";
+      element.append(gap, value);
       element.addEventListener("click", toggle);
       element.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {

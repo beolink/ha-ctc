@@ -529,7 +529,9 @@ class _Builder:
             entities.append({"entity": entity_id, "name": str(name)} if name else entity_id)
         if not entities:
             return None
-        card: dict[str, Any] = {"grid_options": {"columns": 12}}
+        # A graph stands in a section two columns wide, where half the width
+        # would be half a graph.
+        card: dict[str, Any] = {"grid_options": {"columns": "full"}}
         if kind == "history":
             card.update({"type": "history-graph", "hours_to_show": GRAPH_HOURS,
                          "entities": entities})
@@ -692,6 +694,8 @@ def values_sections(
     card = build.list_card(rows)
     card["filter"] = text["filter"]
     card["empty"] = text["empty"]
+    # The list has a section of its own, two columns wide, and fills it.
+    card["grid_options"] = {"columns": "full"}
     section = _section(_heading(text["values"], "mdi:format-list-bulleted"), [card],
                        column_span=2)
     return [section] if section else []
