@@ -79,7 +79,7 @@ def test_readings_only_ever_zero_are_left_out_but_status_control_and_settings_st
 def test_a_section_the_installation_has_nothing_for_goes(dashboard_views, pumps):
     # The i550 Pro's compressor has never run: its refrigerant circuit is all zeros.
     pump = pumps["pt"]
-    compressor = [k for _i, _c, tiles, rows in dashboard_views._TECHNICAL[:1] for k in (*tiles, *rows)]
+    compressor = [k for _i, _c, keys in dashboard_views._TECHNICAL[:1] for k in keys]
     pump["unused"] = [k for k in compressor if k in pump["entities"]]
     config = dashboard_views.build_dashboard([pump], "sv", NEW_HA)
     headings = _headings(_view(config, "performance")["sections"])

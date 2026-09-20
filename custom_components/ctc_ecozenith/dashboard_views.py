@@ -24,14 +24,15 @@ unit without a history page gets no coefficient of performance.
 
 Each pump gets four tabs, in the order the questions come:
 
-  Overview     What the pump is doing right now: its status, the handful of controls
-               worth reaching for, the key readings, and the circuit over a day.
+  Overview     What the pump is doing right now: its status as a line of chips, the
+               handful of controls worth reaching for, a day of the circuit, and the
+               key figures as large numbers.
   Controls     Everything writable, grouped by what it does to the house rather than
                by entity domain: heating, hot water, operation and power.
   Performance  How the pump has run: the graphs, and then every reading in its own
                section, which is what the page carried before the tabs.
-  All values   The full list, every value the installation offers, with a filter and
-               an explanation on each row.
+  All values   The full list, every value the installation offers, in as many columns
+               as the screen has room for, with a filter and an explanation per row.
 
 What a page shows is decided by the installation, not by this module. The lists below
 only say where a value goes if the installation has it: an entity exists or not, is
@@ -41,12 +42,12 @@ hardware that is not fitted and registers a model or software revision does not 
 Status, controls and stored settings are shown whatever they read, and the full list
 shows everything whatever it reads, since that is what it is for.
 
-Two kinds of card carry the values, both from the integration's own card script
-(www/ctc-ecozenith-card.js) so every name can be explained, see explanations.py. The
-few values that matter at a glance, and every control, are Home Assistant's own tiles
-across the whole section, where a Swedish name has room to be read. The rest are rows,
-full name on the left and the value on the right, which is what a long list of readings
-needs. Both carry the blue "i" that opens the explanation.
+Every value is carried by one of the integration's own cards
+(www/ctc-ecozenith-card.js), drawn by hand rather than out of Home Assistant's tiles,
+because a heat pump has a hundred values and they have to fit on a screen: chips for
+the status, large numbers for the key figures, a row with the control itself for
+anything writable, and a dense list everywhere else. Each name carries the blue "i"
+that explains the value, see explanations.py.
 """
 
 from __future__ import annotations
@@ -60,9 +61,6 @@ URL_PATH = "ctc-ecozenith"
 TITLE = "CTC EcoZenith"
 ICON = "mdi:heat-pump"
 
-#: The trend graph under a tile arrived in Home Assistant 2025.9.
-TREND_GRAPH_SINCE = (2025, 9)
-TREND_HOURS = 24
 #: What the graphs cover: a day of readings, a month of daily figures.
 GRAPH_HOURS = 24
 GRAPH_DAYS = 30
@@ -76,7 +74,9 @@ HIDDEN_STATES = ["unavailable", "unknown"]
 UNKNOWN_EXPLANATION = "Ett värde från integrationen som sidan ännu inte har någon egen förklaring för."
 UNKNOWN_SOURCE = "CTC EcoZenith"
 
-TILE_CARD = "custom:ctc-ecozenith-tile"
+CHIPS_CARD = "custom:ctc-ecozenith-chips"
+READINGS_CARD = "custom:ctc-ecozenith-readings"
+CONTROLS_CARD = "custom:ctc-ecozenith-controls"
 ROWS_CARD = "custom:ctc-ecozenith-rows"
 
 HEAT_POWER = "@heat_power"
@@ -96,8 +96,7 @@ _PERIOD_MARKERS = ("/", "24", "30")
 #: How a display value's key starts: the page number it was harvested from.
 _DISPLAY_KEY = re.compile(r"p\d+_")
 
-# The status of the unit, which stays on the page whatever it reads: the tiles
-# first, then the rows. Its heading is the pump's own name.
+# What the unit says about itself, which stays on the page whatever it reads.
 _STATUS_TILES = ("system_status", "hp1_status")
 _STATUS_ROWS = (
     "compressor_running", "defrosting", "immersion_active", "alarm",
@@ -106,9 +105,9 @@ _STATUS_ROWS = (
 
 #: The overview's key figures: how warm it is around the circuit, how hard the
 #: compressor is working and what comes out of it.
-_KEY_TILES = (
-    "outdoor_temp", "room_temp_1", "dhw_temp", "hs1_flow", "hp1_rps",
-    HEAT_POWER, "cop_day",
+_KEY_READINGS = (
+    "outdoor_temp", "room_temp_1", "dhw_temp", "hs1_flow", "return_temp",
+    "hp1_rps", HEAT_POWER, SUPPLIED_POWER, "cop_day", "degree_minutes",
 )
 #: The controls the overview carries, in the order they matter to someone
 #: standing in the house. The rest are one tab away.
@@ -123,36 +122,30 @@ _CONTROL_GROUPS = (
     ("release", "mdi:hand-back-left-outline", ("release_control",)),
 )
 
-# The readings, in sections: (id, icon, tiles, rows).
+# The readings, in sections: (id, icon, keys).
 _READINGS = (
     ("temperatures", "mdi:thermometer",
-     ("outdoor_temp", "room_temp_1"),
-     ("set_room_1", "hs1_flow", "hs1_flow_setpoint", "return_temp",
-      "radiator_temp", "room_temp_2", "hp1_outdoor_temp")),
+     ("outdoor_temp", "room_temp_1", "set_room_1", "hs1_flow", "hs1_flow_setpoint",
+      "return_temp", "radiator_temp", "room_temp_2", "hp1_outdoor_temp")),
     ("hot_water", "mdi:water-boiler",
-     ("dhw_temp",),
-     ("dhw_capacity", "set_dhw_mode", "dhw_lower_temp", "dhw_stop_temp",
+     ("dhw_temp", "dhw_capacity", "set_dhw_mode", "dhw_lower_temp", "dhw_stop_temp",
       "tank_lower_setpoint", "set_extra_dhw", "dhw_circulation", "dhw_temp_raw")),
     ("energy", "mdi:lightning-bolt",
-     ("cop_day", "cop_year", "cop_first_year", "cop_lifetime",
-      HEAT_POWER, SUPPLIED_POWER),
-     (ENERGY_OUT, "compressor_kwh", ENERGY_IN, "immersion_kwh",
+     ("cop_day", "cop_year", "cop_first_year", "cop_lifetime", HEAT_POWER, SUPPLIED_POWER,
+      ENERGY_OUT, "compressor_kwh", ENERGY_IN, "immersion_kwh",
       "immersion_upper_kw", "immersion_lower_kw",
       "current_l1", "current_l2", "current_l3", "hp1_power")),
 )
 _TECHNICAL = (
     ("compressor", "mdi:heat-pump-outline",
-     ("hp1_rps",),
-     ("hp1_charge_pump", "hp1_brine_pump", "hp1_fan", "hp1_in", "hp1_out",
+     ("hp1_rps", "hp1_charge_pump", "hp1_brine_pump", "hp1_fan", "hp1_in", "hp1_out",
       "hp1_brine_in", "hp1_brine_out", "hp1_discharge", "hp1_suction",
       "hp1_high_pressure", "hp1_low_pressure", "compressor_hours",
       "compressor_hours_24h", "degree_minutes", "hp1_defrost_timer")),
     ("settings", "mdi:cog-outline",
-     (),
      ("set_heating_mode_1", "set_hp1_blocked", "set_slope_1", "set_adjust_1",
       "set_max_rps_1", "set_max_immersion_lower", "set_max_immersion_upper")),
     ("unit", "mdi:information-outline",
-     (),
      ("hp_model", "made", "serial", "display_fw", "hp_fw", "bootloader",
       "control_sw", "control_sw_year")),
 )
@@ -171,10 +164,6 @@ _GRAPHS = (
 #: The sections of readings, where a value only ever zero is left out.
 _LEARNT_SECTIONS = frozenset({"temperatures", "hot_water", "energy", "compressor"})
 
-#: Tiles that carry a trend graph where the frontend has one.
-_TREND_KEYS = frozenset({"outdoor_temp", "room_temp_1", "dhw_temp", "hp1_rps"})
-#: Number controls with a wide range get a slider; the rest step with buttons.
-_SLIDER_KEYS = frozenset({"ctl_max_rps", "ctl_immersion_lower", "ctl_immersion_upper"})
 #: How every control entity's name starts (const.CONTROL_NUMBERS and _SELECTS).
 _CONTROL_PREFIX = "Styr "
 
@@ -183,16 +172,14 @@ _CONTROL_PREFIX = "Styr "
 _VALUE_GROUPS = (
     ("status", ICON, _STATUS_TILES + _STATUS_ROWS),
     ("control", "mdi:tune-variant", tuple(k for _id, _icon, keys in _CONTROL_GROUPS for k in keys)),
-    *((section, icon, tiles + rows) for section, icon, tiles, rows in _READINGS + _TECHNICAL),
+    *_READINGS,
+    *_TECHNICAL,
 )
 
 #: Every key the layout knows of. What an installation has beyond this is from a
 #: newer integration than the page, and lands under "Other".
 _KNOWN_KEYS = frozenset(
-    key
-    for _id, _icon, keys in _VALUE_GROUPS
-    for key in keys
-    if not key.startswith("@")
+    key for _id, _icon, keys in _VALUE_GROUPS for key in keys if not key.startswith("@")
 )
 
 TEXT = {
@@ -222,6 +209,7 @@ TEXT = {
         "graph_cop": "Värmefaktor per dygn",
         "filter": "Sök bland värdena",
         "empty": "Inget värde matchar sökningen.",
+        "press": "Utför",
         "control_note": (
             "Styrningen skrivs till CTC:s flyktiga register, och pumpen glömmer bort den "
             "ungefär fem minuter efter den sista skrivningen. Ett läge släpps med "
@@ -270,6 +258,7 @@ TEXT = {
         "graph_cop": "COP per day",
         "filter": "Search the values",
         "empty": "No value matches the search.",
+        "press": "Run",
         "control_note": (
             "Control is written to CTC's volatile registers, and the pump forgets it about "
             "five minutes after the last write. A mode is released with *Release control*, "
@@ -370,7 +359,9 @@ class _Builder:
         self.names: Mapping[str, str] = pump.get("names") or {}
         self.labels = _display_labels(pump)
         self.roles = display_roles(pump)
-        self.trend = tuple(ha_version) >= TREND_GRAPH_SINCE
+        # Kept for the day a card needs a frontend that is newer than the
+        # integration's minimum; everything the page uses is in 2024.12.
+        self.ha_version = tuple(ha_version)
         self.text = text
         self.pages: list[Mapping[str, Any]] = list(pump.get("pages") or [])
         self.interval = pump.get("display_interval")
@@ -426,58 +417,10 @@ class _Builder:
         rest = name[len(_CONTROL_PREFIX):]
         return rest[:1].upper() + rest[1:]
 
-    def tile(self, key: str, hideable: bool, learnt: bool = False) -> dict[str, Any] | None:
-        """Home Assistant's tile inside the card that explains it, or None."""
-        taken = self._take(key, learnt)
-        if taken is None:
-            return None
-        real, entity_id, name = taken
-        tile: dict[str, Any] = {"type": "tile", "entity": entity_id}
-        if name:
-            # Set explicitly, so a tile reads "Utetemperatur" rather than the
-            # device name followed by it.
-            tile["name"] = name
-        domain = entity_id.split(".", 1)[0]
-        if domain in ("number", "select"):
-            if name:
-                tile["name"] = self._under_a_control_heading(name)
-            if domain == "number":
-                style = "slider" if real in _SLIDER_KEYS else "buttons"
-                tile["features"] = [{"type": "numeric-input", "style": style}]
-            else:
-                tile["features"] = [{"type": "select-options"}]
-            # Under the name rather than beside it: the corner above the control
-            # is where the "i" that explains the value sits.
-        elif domain == "button":
-            press = {"action": "perform-action", "perform_action": "button.press",
-                     "target": {"entity_id": entity_id}}
-            tile["hide_state"] = True
-            tile["tap_action"] = press
-            tile["icon_tap_action"] = dict(press)
-        elif self.trend and real in _TREND_KEYS:
-            tile["features"] = [{"type": "trend-graph", "hours_to_show": TREND_HOURS}]
-        explained = self.explanation(real)
-        if domain != "button" and explained.get("explanation"):
-            # Tapping the name explains the value; the icon still opens its dialog.
-            # A button keeps its press, and is explained by the "i" and on hover.
-            tile["tap_action"] = {"action": "none"}
-            tile["icon_tap_action"] = {"action": "more-info"}
-        card: dict[str, Any] = {
-            "type": TILE_CARD,
-            "tile": tile,
-            **explained,
-            "more_info": self.text["more_info"],
-            "explain": self.text["explain"],
-            "grid_options": {"columns": 12},
-        }
-        if hideable:
-            card["visibility"] = [_shown_when_available(entity_id)]
-        return card
-
-    def row(
+    def item(
         self, key: str, hideable: bool, learnt: bool = False, trim: bool = False
     ) -> dict[str, Any] | None:
-        """One line of a list card: name on the left, value on the right."""
+        """One value as the cards take it: what it is, what it means, where from."""
         taken = self._take(key, learnt)
         if taken is None:
             return None
@@ -485,39 +428,72 @@ class _Builder:
         name = name or entity_id
         if trim:
             name = self._under_a_control_heading(name)
-        row: dict[str, Any] = {"entity": entity_id, "name": name}
-        row.update(self.explanation(real))
+        item: dict[str, Any] = {"entity": entity_id, "name": name}
+        item.update(self.explanation(real))
         if hideable:
-            # The card hides the row itself while it has nothing to show.
-            row["hide_unavailable"] = True
-        return row
+            # The card leaves the value out itself while it has nothing to show.
+            item["hide_unavailable"] = True
+        return item
+
+    def _items(self, keys: Iterable[str], **kwargs: Any) -> list[dict[str, Any]]:
+        return [item for item in (self.item(key, **kwargs) for key in keys) if item]
+
+    def _card(self, kind: str, field: str, items: list[dict[str, Any]]) -> dict[str, Any] | None:
+        if not items:
+            return None
+        return {
+            "type": kind,
+            field: items,
+            "more_info": self.text["more_info"],
+            "explain": self.text["explain"],
+            # A section can be several columns wide, and a card of values fills it.
+            "grid_options": {"columns": "full"},
+        }
+
+    @staticmethod
+    def _hide_when_empty(card: dict[str, Any] | None, items: list[dict[str, Any]]) -> None:
+        """A card whose every value is hidden would be an empty frame."""
+        if card is not None:
+            card["visibility"] = _any_of([_shown_when_available(i["entity"]) for i in items])
+
+    def chips(self, keys: Iterable[str]) -> dict[str, Any] | None:
+        """What the pump is doing right now, as a line of chips."""
+        return self._card(CHIPS_CARD, "items", self._items(keys, hideable=False))
+
+    def readings(self, keys: Iterable[str], learnt: bool = True) -> dict[str, Any] | None:
+        """The key figures, each a small name over a large number."""
+        items = self._items(keys, hideable=True, learnt=learnt)
+        card = self._card(READINGS_CARD, "items", items)
+        self._hide_when_empty(card, items)
+        return card
+
+    def controls(self, keys: Iterable[str]) -> dict[str, Any] | None:
+        """One row per control: the name, and the thing it is."""
+        card = self._card(CONTROLS_CARD, "items",
+                          self._items(keys, hideable=False, trim=True))
+        if card is not None:
+            card["press"] = self.text["press"]
+        return card
 
     def rows(self, keys: Iterable[str], hideable: bool, learnt: bool = False) -> dict[str, Any] | None:
-        """A list card with a row per key that has an entity, or None."""
-        rows = [row for row in (self.row(key, hideable, learnt) for key in keys) if row]
-        if not rows:
-            return None
-        card = self.list_card(rows)
+        """A dense list, name on the left and value on the right."""
+        items = self._items(keys, hideable=hideable, learnt=learnt)
+        card = self._card(ROWS_CARD, "rows", items)
         if hideable:
-            # A card whose every row is hidden would be an empty frame.
-            card["visibility"] = _any_of([_shown_when_available(row["entity"]) for row in rows])
+            self._hide_when_empty(card, items)
         return card
 
     def list_card(self, rows: list[dict[str, Any]]) -> dict[str, Any]:
-        """The list card itself, around rows that are already built."""
-        return {
-            "type": ROWS_CARD,
-            "rows": rows,
-            "more_info": self.text["more_info"],
-            "explain": self.text["explain"],
-            "grid_options": {"columns": 12},
-        }
+        """The list card itself, around rows and headings that are already built."""
+        card = self._card(ROWS_CARD, "rows", rows)
+        assert card is not None  # only called with rows in hand
+        return card
 
     def graph(self, graph_id: str, kind: str, keys: Iterable[str]) -> dict[str, Any] | None:
         """A graph of what this installation has of the keys, or None.
 
         Graphs read what the sections show, so they claim nothing: the same
-        value is a tile on one tab and a line here.
+        value is a chip on one tab and a line here.
         """
         entities = []
         for key in keys:
@@ -529,8 +505,6 @@ class _Builder:
             entities.append({"entity": entity_id, "name": str(name)} if name else entity_id)
         if not entities:
             return None
-        # A graph stands in a section two columns wide, where half the width
-        # would be half a graph.
         card: dict[str, Any] = {"grid_options": {"columns": "full"}}
         if kind == "history":
             card.update({"type": "history-graph", "hours_to_show": GRAPH_HOURS,
@@ -580,34 +554,27 @@ def _conditions_in(visibility: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 
 def _note(content: str) -> dict[str, Any]:
-    return {"type": "markdown", "content": content, "grid_options": {"columns": 12}}
+    return {"type": "markdown", "content": content, "grid_options": {"columns": "full"}}
 
 
 def overview_sections(
     pump: Mapping[str, Any], text: Mapping[str, str], ha_version: tuple[int, int]
 ) -> list[dict[str, Any]]:
-    """What the pump is doing right now: status, the near controls, key figures, a day."""
+    """What the pump is doing right now: status, the near controls, a day, key figures."""
     build = _Builder(pump, text, ha_version)
-    sections = [
-        _section(
-            _heading(str(pump.get("name") or TITLE), ICON),
-            [*(build.tile(key, hideable=False) for key in _STATUS_TILES),
-             build.rows(_STATUS_ROWS, hideable=False)],
-        ),
-        _section(
-            _heading(text["quick"], "mdi:tune-variant"),
-            [build.tile(key, hideable=False) for key in _QUICK_CONTROLS],
-        ),
-        _section(
-            _heading(text["readings"], "mdi:gauge"),
-            [build.tile(key, hideable=True, learnt=True) for key in _KEY_TILES],
-        ),
-    ]
     temps = next(graph for graph in _GRAPHS if graph[0] == "graph_temps")
-    # Twice the width of a column of tiles: a day of five lines needs the room.
-    sections.append(_section(
-        _heading(text[temps[0]], "mdi:chart-line"), [build.graph(*temps)], column_span=2
-    ))
+    sections = [
+        # The whole width: a line of chips reads as one line.
+        _section(_heading(str(pump.get("name") or TITLE), ICON),
+                 [build.chips(_STATUS_TILES + _STATUS_ROWS)], column_span=4),
+        _section(_heading(text["quick"], "mdi:tune-variant"),
+                 [build.controls(_QUICK_CONTROLS)]),
+        # Twice the width of a column: a day of five lines needs the room.
+        _section(_heading(text[temps[0]], "mdi:chart-line"),
+                 [build.graph(*temps)], column_span=2),
+        _section(_heading(text["readings"], "mdi:gauge"),
+                 [build.readings(_KEY_READINGS)], column_span=4),
+    ]
     return [section for section in sections if section]
 
 
@@ -618,7 +585,7 @@ def controls_sections(
     build = _Builder(pump, text, ha_version)
     sections: list[dict[str, Any] | None] = []
     for group, icon, keys in _CONTROL_GROUPS:
-        cards: list[dict[str, Any] | None] = [build.tile(key, hideable=False) for key in keys]
+        cards: list[dict[str, Any] | None] = [build.controls(keys)]
         if group == "release" and any(cards):
             cards.append(_note(text["control_note"]))
         sections.append(_section(_heading(text[group], icon), cards))
@@ -640,12 +607,11 @@ def performance_sections(
                  [build.graph(graph_id, kind, keys)], column_span=2)
         for graph_id, kind, keys in _GRAPHS
     ]
-    for section_id, icon, tiles, rows in _READINGS + _TECHNICAL:
+    for section_id, icon, keys in _READINGS + _TECHNICAL:
         learnt = section_id in _LEARNT_SECTIONS
         sections.append(_section(
             _heading(text[section_id], icon),
-            [*(build.tile(key, hideable=True, learnt=learnt) for key in tiles),
-             build.rows(rows, hideable=True, learnt=learnt)],
+            [build.rows(keys, hideable=True, learnt=learnt)],
         ))
 
     # What no list here knows of, from a newer integration than the page. A
@@ -674,7 +640,7 @@ def values_sections(
     rows: list[dict[str, Any]] = []
 
     def group(heading: str, keys: Iterable[str], trim: bool = False) -> None:
-        found = [row for row in (build.row(key, False, trim=trim) for key in keys) if row]
+        found = build._items(keys, hideable=False, trim=trim)
         if found:
             rows.append({"heading": heading})
             rows.extend(found)
@@ -694,10 +660,8 @@ def values_sections(
     card = build.list_card(rows)
     card["filter"] = text["filter"]
     card["empty"] = text["empty"]
-    # The list has a section of its own, two columns wide, and fills it.
-    card["grid_options"] = {"columns": "full"}
     section = _section(_heading(text["values"], "mdi:format-list-bulleted"), [card],
-                       column_span=2)
+                       column_span=4)
     return [section] if section else []
 
 
@@ -760,7 +724,7 @@ def message_dashboard(message: str, lang: str | None) -> dict[str, Any]:
 
 
 def entity_ids(config: Mapping[str, Any]) -> set[str]:
-    """Every entity a built page refers to, looking inside sections, rows and conditions."""
+    """Every entity a built page refers to, looking inside cards, rows and conditions."""
     found: set[str] = set()
 
     def walk(node: Any) -> None:

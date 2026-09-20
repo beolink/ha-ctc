@@ -98,10 +98,10 @@ the moment it is opened, from the entities the integration has at that moment,
 so it is never out of date. Each heat pump gets four tabs.
 
 - **Overview.** What the pump is doing right now: the controller's status and
-  the heat pump's own, the handful of controls worth reaching for, the key
-  readings, and the circuit over the last day.
+  the heat pump's own as a line of chips, the handful of controls worth reaching
+  for, the circuit over the last day, and the key figures as large numbers.
 - **Controls.** Everything writable, as the thing it is, a mode picked from a
-  list, a setpoint stepped or slid, grouped by what it does to the house rather
+  list, a setpoint slid or typed, grouped by what it does to the house rather
   than by entity domain: heating, hot water, operation and power. Letting go of
   every override at once has a section of its own.
 - **Performance.** How the pump has run: the circuit and the compressor over a
@@ -114,9 +114,11 @@ so it is never out of date. Each heat pump gets four tabs.
   panel prints. Nothing is left out here whatever it reads, which makes it the
   tab that answers whether a value exists at all.
 
-The values that matter at a glance, and every control, are Home Assistant's own
-tiles, where a Swedish name has room to be read. Longer lists are rows, full
-name on the left and the value on the right.
+The cards are the integration's own rather than Home Assistant's tiles, because
+a heat pump has a hundred values and they have to fit on a screen: chips for the
+status, a small name over a large number for the key figures, one row with the
+control itself for anything writable, and everywhere else a dense list, name on
+the left and value on the right, in as many columns as the screen has room for.
 
 The display's own web interface is one click away from the device page, under
 *Settings, Devices and services*: the device's link opens the panel's own page

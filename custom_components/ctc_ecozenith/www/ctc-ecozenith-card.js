@@ -1,67 +1,57 @@
 /* CTC EcoZenith: the page's cards, with an explanation for every value.
  *
  * Served by the integration at /ctc_ecozenith/ctc-ecozenith-card.js and loaded as a
- * Lovelace resource. The page itself is built in Python (dashboard_views.py) and
- * uses two cards from here:
+ * Lovelace resource. The page itself is built in Python (dashboard_views.py) and uses
+ * four cards from here, all of them drawn by hand rather than out of Home Assistant's
+ * own tiles, because a heat pump has a hundred values and they have to fit on a screen:
  *
- *   custom:ctc-ecozenith-tile   Home Assistant's own tile, left as it is, with an "i"
- *                               right after the name that writes the explanation out
- *                               under the tile. Tapping the name does the same.
- *   custom:ctc-ecozenith-rows   a list of values, name on the left and value on the
- *                               right, each with its own "i". A list can carry
- *                               headings, and a filter over the whole list, which is
- *                               what the tab with every value needs.
+ *   custom:ctc-ecozenith-chips      what the pump is doing right now, a line of chips
+ *   custom:ctc-ecozenith-readings   the key figures, a small name over a big number
+ *   custom:ctc-ecozenith-controls   one row per control: name on the left, the thing
+ *                                   it is on the right, a list, a slider or a field
+ *   custom:ctc-ecozenith-rows       a list of values, name on the left and value on
+ *                                   the right, in as many columns as there is room
+ *                                   for, with headings and a filter over the lot
  *
- * The explanation is shown on hover through the title attribute, and also on tap,
- * because a hover text alone never reaches a phone or a screen reader, which is
- * what the NIBE page settled on. Every string goes into the page as text, never as
- * HTML.
+ * Every value carries a blue "i" right after its name. It writes the explanation out
+ * underneath, together with where the value comes from and a way into Home Assistant's
+ * own dialog for the entity, which is what the NIBE page settled on. The explanation
+ * is also the hover text, since a hover alone never reaches a phone or a screen reader.
+ * Every string goes into the page as text, never as HTML.
  */
 
 (() => {
   const HIDDEN_STATES = new Set(["unavailable", "unknown"]);
+  //: A number control with more steps than a slider has pixels is a lottery to
+  //: aim at, so it gets a field to type in instead: a room setpoint in tenths
+  //: of a degree from 10 to 30 is 200 steps on 130 pixels.
+  const SLIDER_STEPS = 130;
 
-  /** The parts of a tile that do something of their own when tapped: its
-   *  features, and its icon (ha-tile-icon since 2025, and before that the
-   *  icon-container around ha-tile-icon or ha-tile-image). */
-  const OWN_TAP = ["hui-card-feature", "ha-tile-icon", "ha-tile-image", "ha-control-"];
-
-  const DETAIL_STYLE = `
-    /* A display rule of any card, or ha-card's own :host rule, would otherwise
-       beat the browser's [hidden] and leave a closed explanation on the page. */
+  const STYLE = `
+    /* A display rule of a card, or ha-card's own :host rule, would otherwise beat
+       the browser's [hidden] and leave closed explanations on the page. */
     [hidden] { display: none !important; }
-    .detail {
-      color: var(--secondary-text-color);
-      font-size: 14px;
-      line-height: 1.45;
-      white-space: normal;
-    }
-    .meta {
-      display: block;
-      margin-top: 4px;
-      font-size: 12px;
-    }
-    .meta a {
-      color: var(--primary-color);
-      cursor: pointer;
-      text-decoration: underline;
-    }
+    :host { display: block; }
+    ha-card { padding: 12px 16px; }
     .why {
-      flex: none;
-      background: none;
-      border: none;
-      padding: 0 4px;
-      cursor: pointer;
-      color: var(--primary-color, #03a9f4);
-      font: inherit;
-      line-height: 1;
+      flex: none; background: none; border: none; padding: 0 2px; cursor: pointer;
+      color: var(--primary-color, #03a9f4); font: inherit; line-height: 1;
     }
     .why:focus-visible {
-      outline: 1px solid var(--primary-color, #03a9f4);
-      outline-offset: 2px;
-      border-radius: 50%;
+      outline: 1px solid var(--primary-color, #03a9f4); outline-offset: 2px; border-radius: 50%;
     }
+    .note {
+      color: var(--secondary-text-color); font-size: .85em; line-height: 1.45; padding-top: 4px;
+    }
+    .note .meta { display: block; margin-top: 4px; font-size: .9em; opacity: .85; }
+    .note a { color: var(--primary-color); cursor: pointer; text-decoration: underline; }
   `;
+
+  function moreInfo(element, entityId) {
+    element.dispatchEvent(
+      new CustomEvent("hass-more-info", { bubbles: true, composed: true, detail: { entityId } })
+    );
+  }
 
   /** The blue "i" that opens an explanation. Every value the page shows has one:
    *  a value is only worth reading if you know what it is. */
@@ -79,271 +69,29 @@
     return why;
   }
 
-  function moreInfo(element, entityId) {
-    element.dispatchEvent(
-      new CustomEvent("hass-more-info", {
-        bubbles: true,
-        composed: true,
-        detail: { entityId },
-      })
-    );
+  function withUnit(value, unit) {
+    return unit ? `${value} ${unit}` : String(value);
   }
 
-  /** The explanation, then where the value comes from and a way to its dialog. */
-  function fillDetail(container, config, item, host) {
-    container.replaceChildren();
-    const text = document.createElement("span");
-    text.textContent = item.explanation || "";
-    container.appendChild(text);
-    const meta = document.createElement("span");
-    meta.className = "meta";
-    if (item.source) meta.append(item.source, " · ");
-    const link = document.createElement("a");
-    link.textContent = config.more_info || "More info";
-    link.setAttribute("role", "button");
-    link.tabIndex = 0;
-    const open = (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      moreInfo(host, item.entity);
-    };
-    link.addEventListener("click", open);
-    link.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") open(event);
-    });
-    meta.appendChild(link);
-    container.appendChild(meta);
+  /** Whether the user is holding this very control. The cards live in a shadow
+   *  root, where the document's own idea of what has focus is the card itself,
+   *  so the question has to be put to the root the control is in. */
+  function holding(element) {
+    const root = element.getRootNode();
+    return Boolean(root) && root.activeElement === element;
   }
 
-  class CtcEcoZenithTile extends HTMLElement {
-    constructor() {
-      super();
-      this.attachShadow({ mode: "open" });
-      this._open = false;
-      const style = document.createElement("style");
-      style.textContent = `
-        :host { display: block; }
-        .frame { position: relative; height: var(--ctc-height, auto); }
-        .explained { cursor: help; }
-        /* Right after the name, where the NIBE page puts it. The tile draws the
-           name itself, so the button is placed against the measured text, and
-           falls back to the corner the tile leaves empty. */
-        .why {
-          position: absolute;
-          top: 2px;
-          right: 2px;
-          z-index: 1;
-          padding: 2px 4px;
-          font-size: 15px;
-        }
-        .why.beside {
-          top: auto;
-          right: auto;
-          transform: translateY(-50%);
-        }
-        ha-card.detail { margin-top: 8px; padding: 12px 16px; }
-        ${DETAIL_STYLE}
-      `;
-      this._frame = document.createElement("div");
-      this._frame.className = "frame";
-      this._why = explainButton("", () => this._toggle());
-      this._why.hidden = true;
-      this._detail = document.createElement("ha-card");
-      this._detail.className = "detail";
-      this._detail.hidden = true;
-      this.shadowRoot.append(style, this._frame, this._detail);
-      this._frame.appendChild(this._why);
-      this._frame.addEventListener("click", (event) => this._clicked(event));
-      if (window.ResizeObserver) {
-        // A narrower column moves the name, and with it the button beside it.
-        this._watch = new ResizeObserver(() => this._placeSoon());
-        this._watch.observe(this._frame);
-      }
-      this.addEventListener("keydown", (event) => {
-        if (event.target === this && (event.key === "Enter" || event.key === " ")) {
-          event.preventDefault();
-          this._toggle();
-        }
-      });
-    }
-
-    setConfig(config) {
-      if (!config || !config.tile || !config.tile.entity) {
-        throw new Error("ctc-ecozenith-tile needs a tile with an entity");
-      }
-      this._config = config;
-      if (!customElements.get("hui-tile-card")) {
-        // Lovelace defines its tile with the dashboard; ask to be built again then.
-        customElements.whenDefined("hui-tile-card").then(() => {
-          this.dispatchEvent(new Event("ll-rebuild", { bubbles: true, composed: true }));
-        });
-        return;
-      }
-      if (!this._tile) {
-        this._tile = document.createElement("hui-tile-card");
-        this._frame.insertBefore(this._tile, this._why);
-      }
-      this._tile.setConfig(config.tile);
-      if (this._hass) this._tile.hass = this._hass;
-      if (this._layout) this._tile.layout = this._layout;
-      const rows = this._tileRows();
-      if (typeof rows === "number") {
-        this._frame.style.setProperty(
-          "--ctc-height",
-          `calc(${rows} * var(--row-height, 56px) + ${rows - 1} * var(--row-gap, 8px))`
-        );
-      } else {
-        this._frame.style.removeProperty("--ctc-height");
-      }
-      const explained = Boolean(config.explanation);
-      this.title = config.explanation || "";
-      this.tabIndex = explained ? 0 : -1;
-      this._frame.classList.toggle("explained", explained && this._namesExplain());
-      this._why.hidden = !explained;
-      this._why.setAttribute("aria-label", config.explain || "Explanation");
-      if (explained) fillDetail(this._detail, config, { ...config, entity: config.tile.entity }, this);
-      this._setOpen(this._open && explained);
-      this._placeSoon();
-    }
-
-    set hass(hass) {
-      this._hass = hass;
-      if (this._tile) this._tile.hass = hass;
-      // A new state can change the name's width, and with it where the "i" goes.
-      this._placeSoon();
-    }
-
-    set layout(layout) {
-      this._layout = layout;
-      if (this._tile) this._tile.layout = layout;
-    }
-
-    set preview(preview) {
-      if (this._tile) this._tile.preview = preview;
-    }
-
-    connectedCallback() {
-      this._placeSoon();
-    }
-
-    disconnectedCallback() {
-      if (this._pending) cancelAnimationFrame(this._pending);
-      this._pending = 0;
-    }
-
-    getCardSize() {
-      const size = this._tile && this._tile.getCardSize ? this._tile.getCardSize() : 1;
-      return (typeof size === "number" ? size : 1) + (this._open ? 1 : 0);
-    }
-
-    getGridOptions() {
-      const inner = (this._tile && this._tile.getGridOptions && this._tile.getGridOptions()) || {};
-      // The frame keeps the tile at its own height; the card as a whole grows
-      // when the explanation opens underneath.
-      const options = { ...inner, rows: "auto" };
-      delete options.min_rows;
-      delete options.max_rows;
-      return options;
-    }
-
-    /** Measure once per frame at most: a tile is laid out by Home Assistant, and
-     *  every state in the house sets hass again. */
-    _placeSoon() {
-      if (this._pending || this._why.hidden) return;
-      this._pending = requestAnimationFrame(() => {
-        this._pending = 0;
-        this._place();
-      });
-    }
-
-    /** The name's own text box, inside Home Assistant's tile. Read, never
-     *  written: the tile is left exactly as it is. */
-    _nameText() {
-      const root = this._tile && this._tile.shadowRoot;
-      const info = root && root.querySelector("ha-tile-info");
-      if (!info) return null;
-      return (
-        info.querySelector("span.primary") ||
-        info.querySelector(".primary") ||
-        (info.shadowRoot && info.shadowRoot.querySelector(".primary")) ||
-        null
-      );
-    }
-
-    _place() {
-      const name = this._nameText();
-      const frame = this._frame.getBoundingClientRect();
-      if (!name || !frame.width) return this._corner();
-      const range = document.createRange();
-      range.selectNodeContents(name);
-      const text = range.getBoundingClientRect();
-      // A name that does not fit is cut with an ellipsis, and the button then
-      // stands at the end of the room the name had.
-      const room = name.getBoundingClientRect();
-      if (!text.width || !room.width) return this._corner();
-      const right = Math.min(text.right, room.right);
-      const width = this._why.offsetWidth || 22;
-      this._why.classList.add("beside");
-      this._why.style.left = `${Math.round(
-        Math.min(right - frame.left + 2, Math.max(0, frame.width - width - 2))
-      )}px`;
-      this._why.style.top = `${Math.round(text.top - frame.top + text.height / 2)}px`;
-    }
-
-    _corner() {
-      this._why.classList.remove("beside");
-      this._why.style.left = "";
-      this._why.style.top = "";
-    }
-
-    _tileRows() {
-      const inner = this._tile && this._tile.getGridOptions && this._tile.getGridOptions();
-      return inner ? inner.rows : undefined;
-    }
-
-    /** Whether tapping the name explains: a tile whose tap does something does not. */
-    _namesExplain() {
-      const action = this._config.tile.tap_action;
-      return !action || action.action === "none";
-    }
-
-    _clicked(event) {
-      if (!this._config || !this._config.explanation || !this._namesExplain()) return;
-      for (const element of event.composedPath()) {
-        if (element === this._frame) break;
-        const name = element.localName || "";
-        if (OWN_TAP.some((prefix) => name.startsWith(prefix))) return;
-        if (element.classList && element.classList.contains("icon-container")) return;
-      }
-      this._toggle();
-    }
-
-    _toggle() {
-      this._setOpen(!this._open);
-    }
-
-    _setOpen(open) {
-      this._open = open;
-      this._detail.hidden = !open;
-      this.setAttribute("aria-expanded", String(open));
-    }
-  }
-
-  class CtcEcoZenithRows extends HTMLElement {
-    constructor() {
+  /** What the cards have in common: the explanation, the state, the service call. */
+  class CtcCard extends HTMLElement {
+    constructor(style) {
       super();
       this.attachShadow({ mode: "open" });
       this._open = new Set();
-      this._rows = [];
-      this._headings = [];
-      this._query = "";
+      this._style = style;
     }
 
     setConfig(config) {
-      if (!config || !Array.isArray(config.rows)) {
-        throw new Error("ctc-ecozenith-rows needs rows");
-      }
-      this._config = config;
+      this._config = config || {};
       this._build();
       if (this._hass) this._update();
     }
@@ -353,114 +101,429 @@
       this._update();
     }
 
+    get hass() {
+      return this._hass;
+    }
+
     getCardSize() {
-      return 1 + this._rows.filter((row) => !row.element.hidden).length;
+      return 2;
     }
 
     getGridOptions() {
-      return { columns: 12, min_columns: 6, rows: "auto" };
+      return { columns: "full", rows: "auto" };
+    }
+
+    _shell() {
+      const style = document.createElement("style");
+      style.textContent = `${STYLE}${this._style || ""}`;
+      const card = document.createElement("ha-card");
+      this.shadowRoot.replaceChildren(style, card);
+      return card;
+    }
+
+    /** The name, the "i" after it, and the note the "i" opens. */
+    _named(item, note, tag = "span") {
+      const name = document.createElement(tag);
+      name.className = "label";
+      name.append(item.name || item.entity);
+      if (item.explanation) {
+        name.title = item.explanation;
+        name.appendChild(
+          explainButton(this._config.explain, () => this._toggle(item, note))
+        );
+      }
+      return name;
+    }
+
+    _toggle(item, note) {
+      const open = !this._open.has(item.entity);
+      if (open) this._open.add(item.entity);
+      else this._open.delete(item.entity);
+      this._fill(note, item, open);
+    }
+
+    /** The explanation, then where the value comes from and a way to its dialog. */
+    _fill(note, item, open) {
+      note.hidden = !open;
+      if (!open) return;
+      note.replaceChildren();
+      note.append(item.explanation || "");
+      const meta = document.createElement("span");
+      meta.className = "meta";
+      if (item.source) meta.append(item.source, " · ");
+      const link = document.createElement("a");
+      link.textContent = this._config.more_info || "More info";
+      link.setAttribute("role", "button");
+      link.tabIndex = 0;
+      const openDialog = (event) => {
+        event.preventDefault();
+        event.stopPropagation();
+        moreInfo(this, item.entity);
+      };
+      link.addEventListener("click", openDialog);
+      link.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") openDialog(event);
+      });
+      meta.appendChild(link);
+      note.appendChild(meta);
+    }
+
+    _state(entityId) {
+      return this._hass ? this._hass.states[entityId] : undefined;
+    }
+
+    _text(stateObj) {
+      if (!stateObj) return "";
+      try {
+        return this._hass.formatEntityState
+          ? this._hass.formatEntityState(stateObj)
+          : withUnit(stateObj.state, stateObj.attributes.unit_of_measurement);
+      } catch (err) {
+        return stateObj.state;
+      }
+    }
+
+    _missing(item) {
+      const stateObj = this._state(item.entity);
+      return Boolean(item.hide_unavailable) && (!stateObj || HIDDEN_STATES.has(stateObj.state));
+    }
+
+    _call(entityId, value) {
+      const domain = String(entityId).split(".")[0];
+      if (domain === "select") {
+        this._hass.callService("select", "select_option", { entity_id: entityId, option: value });
+      } else if (domain === "number") {
+        this._hass.callService("number", "set_value", { entity_id: entityId, value: Number(value) });
+      } else if (domain === "button") {
+        this._hass.callService("button", "press", { entity_id: entityId });
+      }
+    }
+  }
+
+  /* ------------------------------------------------------------------ chips */
+
+  const CHIPS_STYLE = `
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+    .chip {
+      display: flex; gap: 6px; align-items: baseline; padding: 6px 12px; border-radius: 999px;
+      background: var(--secondary-background-color, #f1f3f4);
+    }
+    .chip .label { color: var(--secondary-text-color); font-size: .8em; }
+    .chip .value { color: var(--primary-text-color); font-weight: 500; }
+    .chips + .note { padding-top: 10px; }
+  `;
+
+  class CtcEcoZenithChips extends CtcCard {
+    constructor() {
+      super(CHIPS_STYLE);
     }
 
     _build() {
-      const style = document.createElement("style");
-      style.textContent = `
-        ha-card { padding: 8px 0; }
-        .row {
-          display: flex;
-          align-items: center;
-          min-height: 40px;
-          padding: 0 16px;
-          cursor: pointer;
-          outline: none;
+      const card = this._shell();
+      const strip = document.createElement("div");
+      strip.className = "chips";
+      const note = document.createElement("div");
+      note.className = "note";
+      note.hidden = true;
+      this._items = (this._config.items || []).map((item) => {
+        const chip = document.createElement("div");
+        chip.className = "chip";
+        const value = document.createElement("span");
+        value.className = "value";
+        chip.append(this._named(item, note), value);
+        strip.appendChild(chip);
+        return { item, chip, value };
+      });
+      card.append(strip, note);
+    }
+
+    _update() {
+      if (!this._hass) return;
+      for (const row of this._items) {
+        row.chip.hidden = this._missing(row.item);
+        row.value.textContent = this._text(this._state(row.item.entity));
+      }
+    }
+  }
+
+  /* --------------------------------------------------------------- readings */
+
+  const READINGS_STYLE = `
+    .tiles { display: grid; gap: 14px 24px; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); }
+    .tile .label { display: block; color: var(--secondary-text-color); font-size: .8em; overflow-wrap: anywhere; }
+    .tile .big { font-size: 1.6rem; font-weight: 500; color: var(--primary-text-color); }
+    .tile .note { padding-top: 2px; }
+  `;
+
+  class CtcEcoZenithReadings extends CtcCard {
+    constructor() {
+      super(READINGS_STYLE);
+    }
+
+    _build() {
+      const card = this._shell();
+      const grid = document.createElement("div");
+      grid.className = "tiles";
+      this._items = (this._config.items || []).map((item) => {
+        const tile = document.createElement("div");
+        tile.className = "tile";
+        const note = document.createElement("div");
+        note.className = "note";
+        note.hidden = true;
+        const value = document.createElement("div");
+        value.className = "big";
+        tile.append(this._named(item, note, "div"), value, note);
+        grid.appendChild(tile);
+        return { item, tile, value };
+      });
+      card.append(grid);
+    }
+
+    _update() {
+      if (!this._hass) return;
+      for (const row of this._items) {
+        row.tile.hidden = this._missing(row.item);
+        row.value.textContent = this._text(this._state(row.item.entity));
+      }
+    }
+  }
+
+  /* --------------------------------------------------------------- controls */
+
+  const CONTROLS_STYLE = `
+    .control {
+      display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 12px;
+      padding: 8px 0; border-bottom: 1px solid var(--divider-color, #eee);
+    }
+    .control:last-of-type { border-bottom: none; }
+    .control .label { color: var(--primary-text-color); overflow-wrap: break-word; min-width: 0; }
+    .widget { display: flex; align-items: center; gap: 8px; justify-self: end; }
+    .widget[data-pending="1"] { opacity: .5; }
+    select, input[type="number"] {
+      font: inherit; padding: 6px 8px; border-radius: 8px; max-width: 190px;
+      border: 1px solid var(--divider-color, #ccc);
+      background: var(--card-background-color, #fff); color: var(--primary-text-color);
+    }
+    input[type="range"] { width: 130px; accent-color: var(--primary-color, #03a9f4); }
+    .reading { color: var(--primary-text-color); font-weight: 500; min-width: 56px; text-align: right; }
+    .widget button {
+      font: inherit; padding: 6px 14px; border-radius: 8px; cursor: pointer;
+      border: 1px solid var(--primary-color, #03a9f4);
+      background: transparent; color: var(--primary-color, #03a9f4);
+    }
+    .note { grid-column: 1 / -1; }
+  `;
+
+  class CtcEcoZenithControls extends CtcCard {
+    constructor() {
+      super(CONTROLS_STYLE);
+    }
+
+    _build() {
+      const card = this._shell();
+      this._items = (this._config.items || []).map((item) => {
+        const row = document.createElement("div");
+        row.className = "control";
+        const note = document.createElement("div");
+        note.className = "note";
+        note.hidden = true;
+        const widget = document.createElement("span");
+        widget.className = "widget";
+        widget.dataset.pending = "0";
+        row.append(this._named(item, note), widget, note);
+        card.appendChild(row);
+        return { item, row, widget, update: null };
+      });
+    }
+
+    _update() {
+      if (!this._hass) return;
+      for (const row of this._items) {
+        if (!row.update) {
+          // The control is built from the entity's own range and options, so it
+          // waits for the first state rather than guessing at an empty one.
+          if (!this._state(row.item.entity)) continue;
+          row.update = this._widget(row.widget, row.item);
         }
-        .row:focus-visible { background: var(--secondary-background-color); }
-        .icon {
-          flex: none;
-          width: 40px;
-          display: flex;
-          justify-content: center;
-          color: var(--state-icon-color);
+        row.update();
+      }
+    }
+
+    /** Build the control itself and return how to keep it current. A control the
+     *  user is holding is left alone: Home Assistant sends a new state while a
+     *  slider is being dragged, and writing it back would fight the thumb. */
+    _widget(container, item) {
+      const entityId = item.entity;
+      const domain = String(entityId).split(".")[0];
+      const send = (value) => {
+        container.dataset.pending = "1";
+        this._call(entityId, value);
+        setTimeout(() => { container.dataset.pending = "0"; }, 6000);
+      };
+
+      if (domain === "button") {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.textContent = this._config.press || "Press";
+        button.addEventListener("click", () => send(null));
+        container.appendChild(button);
+        return () => {
+          const stateObj = this._state(entityId);
+          button.disabled = !stateObj || stateObj.state === "unavailable";
+        };
+      }
+
+      if (domain === "select") {
+        const select = document.createElement("select");
+        select.addEventListener("change", () => send(select.value));
+        container.appendChild(select);
+        return () => {
+          const stateObj = this._state(entityId);
+          const options = (stateObj && stateObj.attributes.options) || [];
+          if (select.options.length !== options.length ||
+              [...select.options].some((option, i) => option.value !== options[i])) {
+            select.replaceChildren();
+            for (const option of options) {
+              const choice = document.createElement("option");
+              choice.value = option;
+              choice.textContent = option;
+              select.appendChild(choice);
+            }
+          }
+          if (!holding(select) && stateObj) {
+            select.value = stateObj.state;
+            if (select.value === stateObj.state) container.dataset.pending = "0";
+          }
+          select.disabled = !stateObj || stateObj.state === "unavailable";
+        };
+      }
+
+      const attributes = (this._state(entityId) || {}).attributes || {};
+      const step = Number(attributes.step) || 1;
+      const steps = (Number(attributes.max) - Number(attributes.min)) / step;
+      if (item.widget === "slider" || (item.widget !== "field" && steps > 0 && steps <= SLIDER_STEPS)) {
+        const slider = document.createElement("input");
+        slider.type = "range";
+        slider.min = attributes.min;
+        slider.max = attributes.max;
+        slider.step = step;
+        const reading = document.createElement("span");
+        reading.className = "reading";
+        slider.addEventListener("input", () => {
+          reading.textContent = withUnit(slider.value, attributes.unit_of_measurement);
+        });
+        slider.addEventListener("change", () => send(slider.value));
+        container.append(slider, reading);
+        return () => {
+          const stateObj = this._state(entityId);
+          if (!stateObj) return;
+          if (!holding(slider)) {
+            slider.value = stateObj.state;
+            reading.textContent = this._text(stateObj);
+            if (String(slider.value) === String(stateObj.state)) container.dataset.pending = "0";
+          }
+          slider.disabled = stateObj.state === "unavailable";
+        };
+      }
+
+      const field = document.createElement("input");
+      field.type = "number";
+      if (attributes.min !== undefined) field.min = attributes.min;
+      if (attributes.max !== undefined) field.max = attributes.max;
+      field.step = attributes.step || "any";
+      const unit = document.createElement("span");
+      unit.className = "reading";
+      unit.textContent = attributes.unit_of_measurement || "";
+      field.addEventListener("change", () => send(field.value));
+      container.append(field, unit);
+      return () => {
+        const stateObj = this._state(entityId);
+        if (!stateObj) return;
+        if (!holding(field)) {
+          field.value = stateObj.state;
+          if (String(field.value) === String(stateObj.state)) container.dataset.pending = "0";
         }
-        .name {
-          flex: 0 1 auto;
-          min-width: 0;
-          margin-left: 16px;
-          overflow: hidden;
-          text-overflow: ellipsis;
-          white-space: nowrap;
-          color: var(--primary-text-color);
-        }
-        /* The "i" stands right after the name, and the value keeps the right
-           edge to itself. */
-        .gap { flex: 1 1 auto; min-width: 8px; }
-        .value {
-          flex: none;
-          margin-left: 16px;
-          text-align: right;
-          white-space: nowrap;
-          color: var(--primary-text-color);
-        }
-        .detail { padding: 0 16px 10px 72px; }
-        .heading {
-          padding: 16px 16px 4px 16px;
-          font-size: 14px;
-          font-weight: 500;
-          color: var(--secondary-text-color);
-          text-transform: uppercase;
-          letter-spacing: .05em;
-        }
-        .search {
-          display: flex;
-          align-items: center;
-          margin: 4px 16px 8px 16px;
-          padding: 0 8px;
-          border-radius: 8px;
-          background: var(--secondary-background-color, rgba(127,127,127,.12));
-        }
-        .search input {
-          flex: 1;
-          min-width: 0;
-          border: none;
-          outline: none;
-          background: none;
-          padding: 8px 6px;
-          font: inherit;
-          color: var(--primary-text-color);
-        }
-        .empty { padding: 8px 16px 12px 16px; color: var(--secondary-text-color); }
-        ${DETAIL_STYLE}
-      `;
-      const card = document.createElement("ha-card");
+        field.disabled = stateObj.state === "unavailable";
+      };
+    }
+  }
+
+  /* ------------------------------------------------------------------- rows */
+
+  const ROWS_STYLE = `
+    .toolbar { display: flex; gap: 12px; align-items: center; padding-bottom: 10px; }
+    .toolbar input {
+      flex: 1; max-width: 420px; padding: 8px 12px; font: inherit;
+      border: 1px solid var(--divider-color, #ccc); border-radius: 8px;
+      background: var(--card-background-color, #fff); color: var(--primary-text-color);
+    }
+    .count { color: var(--secondary-text-color); font-size: .9em; }
+    .grid { display: grid; gap: 0 24px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+    .heading {
+      grid-column: 1 / -1; font-size: .8rem; font-weight: 500; margin: 14px 0 4px;
+      color: var(--secondary-text-color); text-transform: uppercase; letter-spacing: .04em;
+    }
+    .heading:first-child { margin-top: 0; }
+    .row {
+      display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: baseline;
+      padding: 9px 4px; border-bottom: 1px solid var(--divider-color, #eee);
+      border-radius: 4px; cursor: pointer;
+    }
+    .row:hover, .row:focus-visible { background: var(--secondary-background-color, #f5f5f5); outline: none; }
+    .row .label { color: var(--primary-text-color); overflow-wrap: anywhere; }
+    .value { color: var(--primary-text-color); font-weight: 500; white-space: nowrap; text-align: right; }
+    .note { grid-column: 1 / -1; }
+    .empty { color: var(--secondary-text-color); padding: 16px 4px; }
+  `;
+
+  class CtcEcoZenithRows extends CtcCard {
+    constructor() {
+      super(ROWS_STYLE);
+      this._query = "";
+    }
+
+    setConfig(config) {
+      if (!config || !Array.isArray(config.rows)) {
+        throw new Error("ctc-ecozenith-rows needs rows");
+      }
+      super.setConfig(config);
+    }
+
+    getCardSize() {
+      return 1 + this._items.filter((row) => !row.element.hidden).length;
+    }
+
+    _build() {
+      const card = this._shell();
       if (this._config.filter) card.appendChild(this._searchField());
-      this._rows = [];
+      const grid = document.createElement("div");
+      grid.className = "grid";
+      this._items = [];
       this._headings = [];
       for (const item of this._config.rows) {
         if (item && item.heading !== undefined) {
           const heading = document.createElement("div");
           heading.className = "heading";
           heading.textContent = item.heading;
-          card.appendChild(heading);
+          grid.appendChild(heading);
           this._headings.push({ element: heading, rows: [] });
           continue;
         }
-        const row = this._buildRow(item);
-        card.append(row.element, row.detail);
-        this._rows.push(row);
+        const row = this._row(item);
+        grid.appendChild(row.element);
+        this._items.push(row);
         if (this._headings.length) this._headings[this._headings.length - 1].rows.push(row);
       }
       this._empty = document.createElement("div");
       this._empty.className = "empty";
       this._empty.textContent = this._config.empty || "";
       this._empty.hidden = true;
-      card.appendChild(this._empty);
-      this.shadowRoot.replaceChildren(style, card);
+      card.append(grid, this._empty);
     }
 
     _searchField() {
-      const search = document.createElement("div");
-      search.className = "search";
-      const icon = document.createElement("ha-icon");
-      icon.icon = "mdi:magnify";
+      const toolbar = document.createElement("div");
+      toolbar.className = "toolbar";
       const input = document.createElement("input");
       input.type = "search";
       input.placeholder = this._config.filter === true ? "" : String(this._config.filter);
@@ -470,42 +533,28 @@
         this._query = input.value.trim().toLowerCase();
         this._show();
       });
-      search.append(icon, input);
-      return search;
+      this._count = document.createElement("span");
+      this._count.className = "count";
+      toolbar.append(input, this._count);
+      return toolbar;
     }
 
-    _buildRow(item) {
+    _row(item) {
       const element = document.createElement("div");
       element.className = "row";
       element.tabIndex = 0;
       element.setAttribute("role", "button");
       element.setAttribute("aria-expanded", "false");
-      element.title = item.explanation || "";
-      const icon = document.createElement("ha-state-icon");
-      icon.className = "icon";
-      const name = document.createElement("span");
-      name.className = "name";
-      name.textContent = item.name || item.entity;
+      const note = document.createElement("div");
+      note.className = "note";
+      note.hidden = true;
       const value = document.createElement("span");
       value.className = "value";
-      const detail = document.createElement("div");
-      detail.className = "detail";
-      detail.hidden = true;
-      fillDetail(detail, this._config, item, this);
+      element.append(this._named(item, note), value, note);
       const toggle = () => {
-        const open = detail.hidden;
-        detail.hidden = !open;
-        element.setAttribute("aria-expanded", String(open));
-        if (open) this._open.add(item.entity);
-        else this._open.delete(item.entity);
+        this._toggle(item, note);
+        element.setAttribute("aria-expanded", String(!note.hidden));
       };
-      element.append(icon, name);
-      if (item.explanation) {
-        element.appendChild(explainButton(this._config.explain, toggle));
-      }
-      const gap = document.createElement("span");
-      gap.className = "gap";
-      element.append(gap, value);
       element.addEventListener("click", toggle);
       element.addEventListener("keydown", (event) => {
         if (event.key === "Enter" || event.key === " ") {
@@ -513,33 +562,19 @@
           toggle();
         }
       });
-      if (this._open.has(item.entity)) {
-        detail.hidden = false;
-        element.setAttribute("aria-expanded", "true");
-      }
-      return { item, element, detail, icon, value, seen: undefined, gone: false };
+      return { item, element, note, value, seen: undefined, gone: false };
     }
 
     _update() {
-      const hass = this._hass;
-      if (!hass) return;
-      for (const row of this._rows) {
-        try {
-          const stateObj = hass.states[row.item.entity];
-          row.gone =
-            Boolean(row.item.hide_unavailable) && (!stateObj || HIDDEN_STATES.has(stateObj.state));
-          // Only when the state itself changed: every update of any entity in
-          // Home Assistant sets hass again.
-          if (!stateObj || row.seen === stateObj) continue;
-          row.seen = stateObj;
-          row.icon.hass = hass;
-          row.icon.stateObj = stateObj;
-          row.value.textContent = hass.formatEntityState
-            ? hass.formatEntityState(stateObj)
-            : `${stateObj.state} ${stateObj.attributes.unit_of_measurement || ""}`.trim();
-        } catch (err) {
-          row.value.textContent = "";
-        }
+      if (!this._hass) return;
+      for (const row of this._items) {
+        const stateObj = this._state(row.item.entity);
+        row.gone = this._missing(row.item);
+        // Only when the state itself changed: every update of any entity in
+        // Home Assistant sets hass again.
+        if (!stateObj || row.seen === stateObj) continue;
+        row.seen = stateObj;
+        row.value.textContent = this._text(stateObj);
       }
       this._show();
     }
@@ -547,19 +582,17 @@
     /** What is on show: what has a value to show, and what the search asks for. */
     _show() {
       let shown = 0;
-      for (const row of this._rows) {
+      for (const row of this._items) {
         const hidden = row.gone || !this._matches(row);
         row.element.hidden = hidden;
-        if (hidden) row.detail.hidden = true;
-        else {
-          row.detail.hidden = !this._open.has(row.item.entity);
-          shown += 1;
-        }
+        if (hidden) row.note.hidden = true;
+        else shown += 1;
       }
       // A heading with nothing under it says nothing.
       for (const heading of this._headings) {
         heading.element.hidden = !heading.rows.some((row) => !row.element.hidden);
       }
+      if (this._count) this._count.textContent = `${shown} / ${this._items.length}`;
       if (this._empty) this._empty.hidden = !(this._config.filter && this._query && !shown);
     }
 
@@ -575,10 +608,13 @@
     }
   }
 
-  if (!customElements.get("ctc-ecozenith-tile")) {
-    customElements.define("ctc-ecozenith-tile", CtcEcoZenithTile);
-  }
-  if (!customElements.get("ctc-ecozenith-rows")) {
-    customElements.define("ctc-ecozenith-rows", CtcEcoZenithRows);
+  const CARDS = {
+    "ctc-ecozenith-chips": CtcEcoZenithChips,
+    "ctc-ecozenith-readings": CtcEcoZenithReadings,
+    "ctc-ecozenith-controls": CtcEcoZenithControls,
+    "ctc-ecozenith-rows": CtcEcoZenithRows,
+  };
+  for (const [name, card] of Object.entries(CARDS)) {
+    if (!customElements.get(name)) customElements.define(name, card);
   }
 })();
