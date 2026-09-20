@@ -2,7 +2,7 @@
 
 import asyncio
 
-from test_dashboard import NEW_HA, _headings, _items, _section
+from test_dashboard import NEW_HA, _headings, _items, _section, _values_card, _view
 
 
 class FakeStore:
@@ -45,16 +45,20 @@ def test_what_was_seen_survives_a_restart(seen):
     assert broken.keys == set()
 
 
-def _keys_on_page(pump, config):
+def _keys_on_page(pump, config, paths=("overview", "controls", "performance")):
+    """The keys on the tabs that pick what to show, which the full list does not."""
     by_entity = {entity_id: key for key, entity_id in pump["entities"].items()}
     return {
         by_entity[e]
-        for view in config["views"] for section in view["sections"]
+        for view in config["views"] if view["path"] in paths
+        for section in view["sections"]
         for _k, _c, e in _items(section) if e in by_entity
     }
 
 
-def test_readings_only_ever_zero_are_left_out_but_status_control_and_settings_stay(dashboard_views, pumps):
+def test_readings_only_ever_zero_are_left_out_but_status_control_and_settings_stay(
+    dashboard_views, pumps
+):
     pump = pumps["vsh"]
     pump["unused"] = ["hp1_brine_pump", "current_l1", "current_l2", "current_l3", "dhw_capacity",
                       "p30_emxxx", "ctl_max_rps", "set_heating_mode_1", "system_status"]
@@ -66,7 +70,10 @@ def test_readings_only_ever_zero_are_left_out_but_status_control_and_settings_st
     for key in ("ctl_max_rps", "set_heating_mode_1", "system_status"):
         assert key in on_page, key
     # And a reading left out does not reappear under "Övrigt".
-    assert "Övrigt" not in _headings(config["views"][0]["sections"])
+    assert "Övrigt" not in _headings(_view(config, "performance")["sections"])
+    # The tab with every value is the one place it is still to be found.
+    listed = {row["entity"] for row in _values_card(config)["rows"] if "entity" in row}
+    assert pump["entities"]["hp1_brine_pump"] in listed
 
 
 def test_a_section_the_installation_has_nothing_for_goes(dashboard_views, pumps):
@@ -75,15 +82,23 @@ def test_a_section_the_installation_has_nothing_for_goes(dashboard_views, pumps)
     compressor = [k for _i, _c, tiles, rows in dashboard_views._TECHNICAL[:1] for k in (*tiles, *rows)]
     pump["unused"] = [k for k in compressor if k in pump["entities"]]
     config = dashboard_views.build_dashboard([pump], "sv", NEW_HA)
-    headings = _headings(config["views"][0]["sections"])
+    headings = _headings(_view(config, "performance")["sections"])
     assert "Kompressor och köldkrets" not in headings
-    assert "Temperaturer" in headings and "Styrning" in headings
+    assert "Kompressorn det senaste dygnet" not in headings
+    assert "Temperaturer" in headings
+    # The full list still has them, under the heading that names the circuit.
+    assert "Kompressor och köldkrets" in [
+        row["heading"] for row in _values_card(config)["rows"] if "heading" in row
+    ]
 
 
-def test_a_display_row_only_ever_zero_is_left_out_of_its_page(dashboard_views, pumps):
+def test_a_display_row_only_ever_zero_is_left_out_where_the_page_picks(dashboard_views, pumps):
     pump = pumps["vsh"]
-    pump["unused"] = ["p30_avgiven_kyla_totalt", "p30_avgiven_kyla_30_dagar"]
-    sections = dashboard_views.display_sections(pump, dashboard_views.TEXT["sv"], NEW_HA)
-    history = _section(sections, "Driftinfo, Historik")
-    names = [row["name"] for _k, row, _e in _items(history)]
-    assert "Avgiven kyla totalt" not in names and "Avgiven värme totalt" in names
+    pump["unused"] = ["p22_avgiven_varme", "p30_avgiven_kyla_totalt"]
+    config = dashboard_views.build_dashboard([pump], "sv", NEW_HA)
+    on_page = _keys_on_page(pump, config)
+    assert "p22_avgiven_varme" not in on_page
+    assert "p22_tillford_effekt" in on_page
+    # In the full list it is there, under the page the panel prints it on.
+    names = [row["name"] for row in _values_card(config)["rows"] if "entity" in row]
+    assert "Avgiven värme" in names and "Avgiven kyla totalt" in names

@@ -95,17 +95,28 @@ options if you want them.
 Setting the integration up adds a **CTC EcoZenith** entry to the sidebar on its
 own. There is nothing to configure and no button to press: the page is built
 the moment it is opened, from the entities the integration has at that moment,
-so it is never out of date.
+so it is never out of date. Each heat pump gets four tabs.
 
-- **Overview.** Operation status, temperatures, hot water, energy with the
-  coefficient of performance, control, the compressor and refrigerant circuit,
-  the settings stored in the heat pump and what the unit says about itself.
-  The values that matter at a glance and every control are Home Assistant's own
-  tiles, with the controls inline: a mode is picked from a list, a setpoint is
-  stepped or slid. Longer lists are rows, full name on the left and the value on
-  the right.
-- **Display values.** One section per harvested display page, each row under
-  the name the panel itself prints.
+- **Overview.** What the pump is doing right now: the controller's status and
+  the heat pump's own, the handful of controls worth reaching for, the key
+  readings, and the circuit over the last day.
+- **Controls.** Everything writable, as the thing it is, a mode picked from a
+  list, a setpoint stepped or slid, grouped by what it does to the house rather
+  than by entity domain: heating, hot water, operation and power. Letting go of
+  every override at once has a section of its own.
+- **Performance.** How the pump has run: the circuit and the compressor over a
+  day, energy and the coefficient of performance per day over a month, and then
+  every reading in its own section, temperatures, hot water, energy, the
+  refrigerant circuit, the settings stored in the heat pump and what the unit
+  says about itself.
+- **All values.** The full list with a search field over it, every value the
+  installation offers, the display's own pages among them under the names the
+  panel prints. Nothing is left out here whatever it reads, which makes it the
+  tab that answers whether a value exists at all.
+
+The values that matter at a glance, and every control, are Home Assistant's own
+tiles, where a Swedish name has room to be read. Longer lists are rows, full
+name on the left and the value on the right.
 
 The display's own web interface is one click away from the device page, under
 *Settings, Devices and services*: the device's link opens the panel's own page
@@ -113,14 +124,15 @@ in a new tab. It is not on the CTC EcoZenith page, because a browser will not
 show an http page inside a Home Assistant reached over https, and because the
 panel answers it from the same small web server the integration harvests from.
 
-**Every value is explained.** Hover over a name to read what the value is, or
-tap it and the explanation is written out underneath, with where the value
-comes from (a Modbus register, and whether it is a stored setting or a volatile
-control register, or the display page and how often it is read) and a link to
-Home Assistant's own dialog for the entity. On a tile the icon still opens that
-dialog directly. The explanations come from CTC's BMS manual and CTC's own
-description of the operation data rows, and say so where a register's meaning
-is not confirmed on a running unit. They are in Swedish, like the entity names.
+**Every value is explained.** Beside each one is a blue ⓘ, and it writes the
+explanation out underneath: what the value is, where it comes from, a Modbus
+register and whether it is a stored setting or a volatile control register, or
+the display page and how often it is read, and a link to Home Assistant's own
+dialog for the entity. The name explains itself when tapped too, and on hover,
+and on a tile the icon still opens that dialog directly. The explanations come
+from CTC's BMS manual and CTC's own description of the operation data rows, and
+say so where a register's meaning is not confirmed on a running unit. They are
+in Swedish, like the entity names.
 
 **What is on the page is decided by your installation.** Heat pumps, indoor
 units, software revisions and settings differ, and the controller answers for
@@ -131,7 +143,8 @@ only ever reported as zero is left off, and it turns up the first time it has a
 value. The integration remembers what it has seen, and the first time it runs it
 looks through the past year of Home Assistant's own statistics, so a compressor
 that is merely at rest right now is not mistaken for one that is missing. Status,
-controls and the settings stored in the heat pump are shown whatever they read.
+controls and the settings stored in the heat pump are shown whatever they read,
+and so is everything on All values, which is the point of that tab.
 
 A reading with nothing to show, such as a sensor CTC reports as not fitted, a
 display page not reached yet or a yearly figure without a year of history, is

@@ -4,11 +4,13 @@
  * Lovelace resource. The page itself is built in Python (dashboard_views.py) and
  * uses two cards from here:
  *
- *   custom:ctc-ecozenith-tile   Home Assistant's own tile, left as it is, with the
- *                               value's explanation on hover and written out under
- *                               the tile when its name is tapped.
+ *   custom:ctc-ecozenith-tile   Home Assistant's own tile, left as it is, with an "i"
+ *                               in its corner that writes the explanation out under
+ *                               the tile. Tapping the name does the same.
  *   custom:ctc-ecozenith-rows   a list of values, name on the left and value on the
- *                               right, explained the same way.
+ *                               right, each with its own "i". A list can carry
+ *                               headings, and a filter over the whole list, which is
+ *                               what the tab with every value needs.
  *
  * The explanation is shown on hover through the title attribute, and also on tap,
  * because a hover text alone never reaches a phone or a screen reader, which is
@@ -44,7 +46,38 @@
       cursor: pointer;
       text-decoration: underline;
     }
+    .why {
+      flex: none;
+      background: none;
+      border: none;
+      padding: 0 4px;
+      cursor: pointer;
+      color: var(--primary-color, #03a9f4);
+      font: inherit;
+      line-height: 1;
+    }
+    .why:focus-visible {
+      outline: 1px solid var(--primary-color, #03a9f4);
+      outline-offset: 2px;
+      border-radius: 50%;
+    }
   `;
+
+  /** The blue "i" that opens an explanation. Every value the page shows has one:
+   *  a value is only worth reading if you know what it is. */
+  function explainButton(label, toggle) {
+    const why = document.createElement("button");
+    why.className = "why";
+    why.type = "button";
+    why.textContent = "ⓘ";
+    why.setAttribute("aria-label", label || "Explanation");
+    why.addEventListener("click", (event) => {
+      event.preventDefault();
+      event.stopPropagation();
+      toggle();
+    });
+    return why;
+  }
 
   function moreInfo(element, entityId) {
     element.dispatchEvent(
@@ -90,17 +123,30 @@
       const style = document.createElement("style");
       style.textContent = `
         :host { display: block; }
-        .frame { height: var(--ctc-height, auto); }
+        .frame { position: relative; height: var(--ctc-height, auto); }
         .explained { cursor: help; }
+        /* The corner above the value, which a tile leaves empty: its name and
+           state stand to the left of it, and a control under them. */
+        .why {
+          position: absolute;
+          top: 2px;
+          right: 2px;
+          z-index: 1;
+          padding: 4px 6px;
+          font-size: 15px;
+        }
         ha-card.detail { margin-top: 8px; padding: 12px 16px; }
         ${DETAIL_STYLE}
       `;
       this._frame = document.createElement("div");
       this._frame.className = "frame";
+      this._why = explainButton("", () => this._toggle());
+      this._why.hidden = true;
       this._detail = document.createElement("ha-card");
       this._detail.className = "detail";
       this._detail.hidden = true;
       this.shadowRoot.append(style, this._frame, this._detail);
+      this._frame.appendChild(this._why);
       this._frame.addEventListener("click", (event) => this._clicked(event));
       this.addEventListener("keydown", (event) => {
         if (event.target === this && (event.key === "Enter" || event.key === " ")) {
@@ -124,7 +170,7 @@
       }
       if (!this._tile) {
         this._tile = document.createElement("hui-tile-card");
-        this._frame.appendChild(this._tile);
+        this._frame.insertBefore(this._tile, this._why);
       }
       this._tile.setConfig(config.tile);
       if (this._hass) this._tile.hass = this._hass;
@@ -142,6 +188,8 @@
       this.title = config.explanation || "";
       this.tabIndex = explained ? 0 : -1;
       this._frame.classList.toggle("explained", explained && this._namesExplain());
+      this._why.hidden = !explained;
+      this._why.setAttribute("aria-label", config.explain || "Explanation");
       if (explained) fillDetail(this._detail, config, { ...config, entity: config.tile.entity }, this);
       this._setOpen(this._open && explained);
     }
@@ -214,6 +262,8 @@
       this.attachShadow({ mode: "open" });
       this._open = new Set();
       this._rows = [];
+      this._headings = [];
+      this._query = "";
     }
 
     setConfig(config) {
@@ -275,50 +325,121 @@
           color: var(--primary-text-color);
         }
         .detail { padding: 0 16px 10px 72px; }
+        .heading {
+          padding: 16px 16px 4px 16px;
+          font-size: 14px;
+          font-weight: 500;
+          color: var(--secondary-text-color);
+          text-transform: uppercase;
+          letter-spacing: .05em;
+        }
+        .search {
+          display: flex;
+          align-items: center;
+          margin: 4px 16px 8px 16px;
+          padding: 0 8px;
+          border-radius: 8px;
+          background: var(--secondary-background-color, rgba(127,127,127,.12));
+        }
+        .search input {
+          flex: 1;
+          min-width: 0;
+          border: none;
+          outline: none;
+          background: none;
+          padding: 8px 6px;
+          font: inherit;
+          color: var(--primary-text-color);
+        }
+        .empty { padding: 8px 16px 12px 16px; color: var(--secondary-text-color); }
         ${DETAIL_STYLE}
       `;
       const card = document.createElement("ha-card");
-      this._rows = this._config.rows.map((item) => {
-        const element = document.createElement("div");
-        element.className = "row";
-        element.tabIndex = 0;
-        element.setAttribute("role", "button");
-        element.setAttribute("aria-expanded", "false");
-        element.title = item.explanation || "";
-        const icon = document.createElement("ha-state-icon");
-        icon.className = "icon";
-        const name = document.createElement("span");
-        name.className = "name";
-        name.textContent = item.name || item.entity;
-        const value = document.createElement("span");
-        value.className = "value";
-        element.append(icon, name, value);
-        const detail = document.createElement("div");
-        detail.className = "detail";
-        detail.hidden = true;
-        fillDetail(detail, this._config, item, this);
-        const toggle = () => {
-          const open = detail.hidden;
-          detail.hidden = !open;
-          element.setAttribute("aria-expanded", String(open));
-          if (open) this._open.add(item.entity);
-          else this._open.delete(item.entity);
-        };
-        element.addEventListener("click", toggle);
-        element.addEventListener("keydown", (event) => {
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            toggle();
-          }
-        });
-        if (this._open.has(item.entity)) {
-          detail.hidden = false;
-          element.setAttribute("aria-expanded", "true");
+      if (this._config.filter) card.appendChild(this._searchField());
+      this._rows = [];
+      this._headings = [];
+      for (const item of this._config.rows) {
+        if (item && item.heading !== undefined) {
+          const heading = document.createElement("div");
+          heading.className = "heading";
+          heading.textContent = item.heading;
+          card.appendChild(heading);
+          this._headings.push({ element: heading, rows: [] });
+          continue;
         }
-        card.append(element, detail);
-        return { item, element, detail, icon, value, seen: undefined };
-      });
+        const row = this._buildRow(item);
+        card.append(row.element, row.detail);
+        this._rows.push(row);
+        if (this._headings.length) this._headings[this._headings.length - 1].rows.push(row);
+      }
+      this._empty = document.createElement("div");
+      this._empty.className = "empty";
+      this._empty.textContent = this._config.empty || "";
+      this._empty.hidden = true;
+      card.appendChild(this._empty);
       this.shadowRoot.replaceChildren(style, card);
+    }
+
+    _searchField() {
+      const search = document.createElement("div");
+      search.className = "search";
+      const icon = document.createElement("ha-icon");
+      icon.icon = "mdi:magnify";
+      const input = document.createElement("input");
+      input.type = "search";
+      input.placeholder = this._config.filter === true ? "" : String(this._config.filter);
+      input.setAttribute("aria-label", input.placeholder);
+      input.value = this._query;
+      input.addEventListener("input", () => {
+        this._query = input.value.trim().toLowerCase();
+        this._show();
+      });
+      search.append(icon, input);
+      return search;
+    }
+
+    _buildRow(item) {
+      const element = document.createElement("div");
+      element.className = "row";
+      element.tabIndex = 0;
+      element.setAttribute("role", "button");
+      element.setAttribute("aria-expanded", "false");
+      element.title = item.explanation || "";
+      const icon = document.createElement("ha-state-icon");
+      icon.className = "icon";
+      const name = document.createElement("span");
+      name.className = "name";
+      name.textContent = item.name || item.entity;
+      const value = document.createElement("span");
+      value.className = "value";
+      const detail = document.createElement("div");
+      detail.className = "detail";
+      detail.hidden = true;
+      fillDetail(detail, this._config, item, this);
+      const toggle = () => {
+        const open = detail.hidden;
+        detail.hidden = !open;
+        element.setAttribute("aria-expanded", String(open));
+        if (open) this._open.add(item.entity);
+        else this._open.delete(item.entity);
+      };
+      element.append(icon, name);
+      if (item.explanation) {
+        element.appendChild(explainButton(this._config.explain, toggle));
+      }
+      element.appendChild(value);
+      element.addEventListener("click", toggle);
+      element.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          toggle();
+        }
+      });
+      if (this._open.has(item.entity)) {
+        detail.hidden = false;
+        element.setAttribute("aria-expanded", "true");
+      }
+      return { item, element, detail, icon, value, seen: undefined, gone: false };
     }
 
     _update() {
@@ -327,11 +448,8 @@
       for (const row of this._rows) {
         try {
           const stateObj = hass.states[row.item.entity];
-          const hidden =
+          row.gone =
             Boolean(row.item.hide_unavailable) && (!stateObj || HIDDEN_STATES.has(stateObj.state));
-          row.element.hidden = hidden;
-          if (hidden) row.detail.hidden = true;
-          else if (this._open.has(row.item.entity)) row.detail.hidden = false;
           // Only when the state itself changed: every update of any entity in
           // Home Assistant sets hass again.
           if (!stateObj || row.seen === stateObj) continue;
@@ -345,6 +463,37 @@
           row.value.textContent = "";
         }
       }
+      this._show();
+    }
+
+    /** What is on show: what has a value to show, and what the search asks for. */
+    _show() {
+      let shown = 0;
+      for (const row of this._rows) {
+        const hidden = row.gone || !this._matches(row);
+        row.element.hidden = hidden;
+        if (hidden) row.detail.hidden = true;
+        else {
+          row.detail.hidden = !this._open.has(row.item.entity);
+          shown += 1;
+        }
+      }
+      // A heading with nothing under it says nothing.
+      for (const heading of this._headings) {
+        heading.element.hidden = !heading.rows.some((row) => !row.element.hidden);
+      }
+      if (this._empty) this._empty.hidden = !(this._config.filter && this._query && !shown);
+    }
+
+    /** A row is searched by everything it says: its name, its explanation, where
+     *  the value comes from, and the value itself. */
+    _matches(row) {
+      if (!this._query) return true;
+      const item = row.item;
+      const haystack = [
+        item.name, item.explanation, item.source, item.entity, row.value.textContent,
+      ].join(" ").toLowerCase();
+      return this._query.split(/\s+/).every((word) => haystack.includes(word));
     }
   }
 
